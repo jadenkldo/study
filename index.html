@@ -7,8 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Study">
-<meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0c0c0c" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="tc" content="#faf9f7">
 <meta name="color-scheme" content="light dark">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.webmanifest">
@@ -71,14 +70,9 @@ h1,h2,h3,.serif{font-family:var(--font-display);font-weight:600;letter-spacing:-
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);flex:none;}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 /* live app windows: kept alive once opened, so switching is instant and each app keeps its place */
-/* full-screen sizing: --fullh is the real screen height, set from script. iOS home-screen apps can report a layout
-   viewport shorter than the screen by the home-indicator band, so inset:0 / 100% / 100dvh would stop short of the bottom */
-#wins{position:fixed;left:0;top:0;width:100%;height:var(--fullh,100%);pointer-events:none;z-index:10;}
-/* the status cap: one solid band, the open app's own paper, across the status-bar zone. iOS draws its blurred
-   scroll-edge band over the top of a page whose top edge has no solid fixed element; this is that element.
-   No blur, no gradient, no transparency */
-#cap{position:fixed;left:0;right:0;top:0;height:var(--capH,0px);background:var(--capc,var(--bg));z-index:35;pointer-events:none;}
-#basecap{position:fixed;left:0;right:0;top:50%;height:calc(var(--fullh,100vh) + 200px);background:var(--basec,var(--bg));z-index:0;pointer-events:none;}
+/* the open app is exactly the visible page: fixed to all four edges, never larger. (Some iOS home-screen builds keep a
+   system bar at the top and a band at the bottom that a page cannot paint; those are coloured with theme-color.) */
+#wins{position:fixed;inset:0;pointer-events:none;z-index:10;overflow:hidden;}
 .win{position:absolute;inset:0;visibility:hidden;pointer-events:none;overflow:hidden;background:var(--wp);}
 .win.on{visibility:visible;pointer-events:auto;}
 .win iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:var(--wp);}
@@ -108,7 +102,7 @@ body:not(.stack) #labels{opacity:0;transition:opacity .12s;}
 .lab .g{display:block;font-size:14px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lab:focus-visible{outline:2px solid var(--text);outline-offset:4px;}
 body.anim .lab{transition:transform .46s var(--ease);}
-#deck{position:fixed;left:0;top:0;width:100%;height:var(--fullh,100%);z-index:20;display:none;touch-action:pan-y;}
+#deck{position:fixed;inset:0;z-index:20;display:none;touch-action:pan-y;}
 body.stack #deck{display:block;}
 /* the grab bar: a sheet handle under the Dynamic Island. The 44px hit zone lives in the safe-area band, above both apps'
    own top bars; only the 5px bar shows */
@@ -118,7 +112,7 @@ body:not(.stack) #grab{display:block;}
 #grab.held i{opacity:.8;transform:scaleX(1.2);}
 #grab:focus-visible{outline:2px solid var(--grab);outline-offset:-2px;border-radius:12px;}
 /* sync line: the one quiet word on how the phone stands with the vault; tap it for the connection sheet */
-#status{position:fixed;left:50%;top:calc(var(--fullh,100vh) - var(--insb,0px) - 46px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
+#status{position:fixed;left:50%;bottom:calc(var(--sab) + 2px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
   font-size:13px;color:var(--text3);white-space:nowrap;border-radius:99px;transition:opacity .2s;}
 #status i{width:7px;height:7px;border-radius:50%;background:var(--rule3);flex:none;}
 #status.warn{color:var(--duesoon);} #status.warn i{background:#f0a81c;}
@@ -129,7 +123,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 @media (max-width:380px){#hd h1{font-size:24px;}.lab .nm{font-size:19px;}.lab .g{font-size:13.5px;}}
 
 /* ══ the reading sheet: notes, PDFs and the connection panel, read-only, on the shell's own paper ══ */
-#sheet{position:fixed;left:0;top:0;width:100%;height:var(--fullh,100%);z-index:60;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);visibility:hidden;
+#sheet{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);visibility:hidden;
   transition:transform .42s var(--ease),visibility 0s linear .42s;}
 #sheet.open{transform:none;visibility:visible;transition:transform .42s var(--ease);}
 #sheet>header{flex:none;display:flex;align-items:center;gap:2px;min-height:56px;padding:calc(var(--sat) + 4px) calc(6px + var(--sar)) 4px calc(6px + var(--sal));
@@ -139,7 +133,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 .ib{width:44px;height:44px;display:grid;place-items:center;border-radius:10px;color:var(--text2);flex:none;}
 .ib svg{width:22px;height:22px;}
 .ib:active{background:var(--surface-dim);color:var(--text);}
-#sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px calc(20px + var(--sar)) calc(var(--insb,0px) + 48px) calc(20px + var(--sal));}
+#sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px calc(20px + var(--sar)) calc(var(--sab) + 48px) calc(20px + var(--sal));}
 #sheet .body:focus{outline:none;}
 .md{max-width:65ch;margin:0 auto;font-size:16px;line-height:1.6;overflow-wrap:break-word;}
 .md>*+*{margin-top:.8em;}
@@ -195,7 +189,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 .btn[disabled]{opacity:.6;cursor:default;}
 .btn svg{width:19px;height:19px;}
 
-#setup{position:fixed;left:0;top:0;width:100%;height:var(--fullh,100%);z-index:80;background:var(--bg);overflow-y:auto;display:none;}
+#setup{position:fixed;inset:0;z-index:80;background:var(--bg);overflow-y:auto;display:none;}
 #setup.on{display:block;}
 #setup main{max-width:440px;margin:0 auto;padding:calc(var(--sat) + 44px) calc(24px + var(--sar)) calc(var(--sab) + 32px) calc(24px + var(--sal));}
 #setup h1{font-size:30px;margin-bottom:12px;}
@@ -225,9 +219,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 <div id="sa" aria-hidden="true"></div>
 <div class="island" aria-hidden="true"></div><div class="clock num" aria-hidden="true">7:09</div>
 <header id="hd"><h1 id="date">Today</h1><span class="wk num" id="wk"></span></header>
-<div id="basecap" aria-hidden="true"></div>
 <div id="wins"></div>
-<div id="cap" aria-hidden="true"></div>
 <div id="labels" role="list" aria-label="Apps"></div>
 <div id="deck" aria-hidden="true"></div>
 <div id="grab" role="button" tabindex="0" aria-label="Back to all apps"><i></i></div>
@@ -298,45 +290,27 @@ function toast(msg,ms=3200){const t=$('#toast');t.textContent=msg;t.classList.ad
 /* ---------- theme: follows the iPhone ---------- */
 function applyTheme(){
   document.documentElement.dataset.theme=isDark()?'dark':'light';
+  if(typeof canvasFor==='function')canvasFor(canvasApp);
 }
-/* the page under and around the open app takes the app's own colours: paper above (status cap included), its tab bar
-   colour below, so the app reads edge to edge like a native one. Home, or mid-gesture: the shell's paper. */
+/* the page behind the open app, and the system bars iOS keeps above and below it (theme-color), take the app's own
+   paper; home takes the shell's. One colour has to serve both bars, so it is the app's page colour: the top bar then
+   runs straight into the app's header, and the bottom band sits under a tab bar within a shade of it. */
+let canvasApp=null;
 function canvasFor(a){
+  canvasApp=a||null;
   const r=document.documentElement.style;
-  if(!a){['--canvas','--capc','--basec'].forEach(k=>r.removeProperty(k));return;}
-  const L=look(a);r.setProperty('--canvas',L.paper);r.setProperty('--capc',L.paper);r.setProperty('--basec',L.bar||L.paper);
+  if(a)r.setProperty('--canvas',look(a).paper);else r.removeProperty('--canvas');
+  const tc=$('#tc');if(tc)tc.setAttribute('content',a?look(a).paper:(isDark()?'#0c0c0c':'#faf9f7'));
 }
 applyTheme();
 
 /* ---------- safe areas: the shell measures them once and hands each app the numbers (env() reads 0 inside a frame) ---------- */
-/* home-screen app (standalone) = full screen: the shell owns every pixel down to the bottom edge */
-const STANDALONE=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches||P.get('standalone')==='1';
-/* The real screen. iOS home-screen apps (seen on iOS 26) can lay the page out on a viewport shorter than the screen by
-   the home-indicator band while still painting below it: anything sized inset:0 / 100% / 100dvh then stops short and
-   leaves a strip. In standalone the screen IS the window, so size from it. Only a small shortfall counts (a split
-   view or an open keyboard is a real, smaller window); clientHeight, not innerHeight, so the keyboard never shrinks it. */
-function screenBox(){
-  const vw=document.documentElement.clientWidth||innerWidth,vh=document.documentElement.clientHeight||innerHeight;
-  let H=vh,gap=0;
-  if(STANDALONE&&screen&&screen.height){
-    const portrait=vh>=vw,sh=portrait?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height);
-    if(sh>vh&&sh-vh<=80){gap=sh-vh;H=sh;}
-  }
-  return{W:vw,H,gap,portrait:vh>=vw};
-}
+/* the visible page, as laid out: the open app is exactly this size, and gets exactly the insets iOS reports (even 0) */
+function viewBox(){const w=document.documentElement.clientWidth||innerWidth,h=document.documentElement.clientHeight||innerHeight;return{W:w,H:h,portrait:h>=w};}
 function insets(){
-  const box=screenBox();
-  if(document.documentElement.classList.contains('sim'))return box.portrait?{t:59,b:34,l:0,r:0}:{t:0,b:21,l:59,r:59};
+  if(document.documentElement.classList.contains('sim'))return viewBox().portrait?{t:59,b:34,l:0,r:0}:{t:0,b:21,l:59,r:59};
   const cs=getComputedStyle($('#sa'));
-  const i={t:parseFloat(cs.paddingTop)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0,r:parseFloat(cs.paddingRight)||0};
-  /* the short viewport also reads the bottom inset as 0, though the home indicator sits over the frame we extend */
-  if(box.gap>0){i.b=Math.max(i.b,box.portrait?34:21);if(box.portrait&&i.t<20)i.t=box.H>=852?59:47;}
-  return i;
-}
-/* hand the numbers to the CSS: real height, real bottom inset, and the height of the status band the cap covers */
-function applyFrame(){
-  const box=screenBox(),i=insets(),r=document.documentElement.style;
-  r.setProperty('--fullh',box.H+'px');r.setProperty('--insb',i.b+'px');r.setProperty('--capH',(STANDALONE||document.documentElement.classList.contains('sim')?i.t:0)+'px');
+  return{t:parseFloat(cs.paddingTop)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0,r:parseFloat(cs.paddingRight)||0};
 }
 /* the bar needs no room where there is a status-bar band to sit in; without one (landscape, desktop) it takes 20px */
 const grabBand=()=>insets().t>=44?0:20;
@@ -360,22 +334,57 @@ const DB={
 /* ══ the gatekeeper: JSON over a text/plain POST (no CORS preflight), every call carries the key ══ */
 const CFG_KEY='study-shell.gatekeeper';
 let GK=null;try{GK=JSON.parse(localStorage.getItem(CFG_KEY)||'null');}catch(e){}
+/* Three kinds of failure, kept apart because they mean different things to Jaden:
+   NetError  — no answer: the request dropped, timed out, or Google sent an error page instead of data
+   Suspended — the phone hid the app mid-request (iOS cuts those off): NOT an error, the request is simply not sent yet
+   GateError — the gatekeeper answered and refused (bad key, a file it won't touch, a state file mid-sync)
+   Only foreground calls (the sync itself: stat, save, the error log) move the status line, and only after a retry;
+   background downloads (apps, banks, the SQL engine) have their own longer timeout and retries and never touch it. */
 class NetError extends Error{}
+class Suspended extends NetError{}
 class GateError extends Error{}
-const NET={down:false,last:0,err:''};
-async function api(action,args,{timeout=60000,cfg=GK}={}){
-  if(!cfg)throw new GateError('not connected');
-  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),timeout);
-  let r;
-  try{r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({key:cfg.key,action},args||{})),
-    redirect:'follow',cache:'no-store',credentials:'omit',signal:ctl.signal});}
-  catch(e){clearTimeout(t);NET.down=true;NET.err=String(e&&e.message||e);syncLine();throw new NetError('offline');}
-  clearTimeout(t);
-  let j;try{j=await r.json();}catch(e){throw new GateError('The gatekeeper answered with a web page, not data. Check the deployment gives access to Anyone.');}
-  if(NET.down){NET.down=false;syncLine();}
-  if(!j||!j.ok)throw new GateError(j&&j.error||'the gatekeeper refused');
-  return j;
+const TIMEOUTS={fg:45000,bg:180000,retryFg:1500,retryBg:[2000,5000,12000]};
+const NET={fails:0,lastErr:null};          /* fails: consecutive foreground requests that failed even after their retry */
+const INFLIGHT=new Set();
+let hideEpoch=0;
+async function attempt(cfg,action,args,timeout){
+  const ctl=new AbortController(),req={ctl,epoch:hideEpoch,why:''};INFLIGHT.add(req);
+  const t=setTimeout(()=>{req.why='timeout';ctl.abort();},timeout);
+  const lost=e=>{
+    if(req.why==='hidden'||req.epoch!==hideEpoch||document.hidden)return new Suspended('not sent yet: the app was in the background');
+    if(req.why==='timeout')return new NetError(`timed out after ${Math.round(timeout/1000)}s`);
+    return new NetError(navigator.onLine?'no answer (the connection dropped)':'no connection');
+  };
+  try{
+    let r,txt;
+    try{r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({key:cfg.key,action},args||{})),
+      redirect:'follow',cache:'no-store',credentials:'omit',signal:ctl.signal});
+      txt=await r.text();}
+    catch(e){throw lost(e);}
+    if(!r.ok)throw new NetError(`Google said: HTTP ${r.status}${r.statusText?' '+r.statusText:''}`);
+    let j;try{j=JSON.parse(txt);}
+    catch(e){const ti=(/<title>([^<]*)<\/title>/i.exec(txt)||[])[1];throw new NetError('Google sent a web page instead of data'+(ti&&ti.trim()?` ("${ti.trim().slice(0,70)}")`:''));}
+    if(!j||!j.ok)throw new GateError(j&&j.error||'the gatekeeper refused');
+    return j;
+  }finally{clearTimeout(t);INFLIGHT.delete(req);}
 }
+async function api(action,args,{cfg=GK,bg=false,timeout}={}){
+  if(!cfg)throw new GateError('not connected');
+  const tries=bg?TIMEOUTS.retryBg.length+1:2;
+  for(let k=1;;k++){
+    try{const j=await attempt(cfg,action,args,timeout||(bg?TIMEOUTS.bg:TIMEOUTS.fg));if(!bg&&NET.fails){NET.fails=0;syncLine();}return j;}
+    catch(e){
+      if(e instanceof GateError){if(!bg){NET.fails=0;NET.lastErr={at:Date.now(),msg:'the gatekeeper said: '+e.message};syncLine();}throw e;}
+      if(e instanceof Suspended)throw e;
+      if(k>=tries||!navigator.onLine){if(!bg)gateFailed(e);throw e;}
+      await sleep(bg?TIMEOUTS.retryBg[k-1]:TIMEOUTS.retryFg);
+      if(document.hidden)throw new Suspended('not sent yet: the app was in the background');
+    }
+  }
+}
+function gateFailed(e){NET.fails++;NET.lastErr={at:Date.now(),msg:e.message};syncLine();soon();}
+/* resume: whatever was in flight when the phone hid the app is dead or stale; drop it and start over at once */
+function abortStale(){INFLIGHT.forEach(r=>{if(r.epoch!==hideEpoch){r.why='hidden';r.ctl.abort();}});}
 
 /* ══ files ══ */
 const TEXT_EXT=/\.(html?|json|js|css|md|txt|svg)$/i;
@@ -391,13 +400,13 @@ function entryFrom(f,bytes){
   return e;
 }
 async function remember(e){if(e.text!=null)FILES.set(e.path,e);await DB.put('files',e.path,e);return e;}
-async function fetchChunked(path,head){
+async function fetchChunked(path,head,prog){
   for(let attempt=0;attempt<2;attempt++){
-    const first=await api('read',{path,offset:0,length:CHUNK});
+    const first=await api('read',{path,offset:0,length:CHUNK},{bg:true});if(prog)prog.done++;
     const size=first.size,step=first.length||CHUNK,parts=[b64ToBytes(first.base64)],offs=[];
     for(let o=step;o<size;o+=step)offs.push(o);
     let i=0,moved=false;
-    const worker=async()=>{while(i<offs.length&&!moved){const k=i++;const r=await api('read',{path,offset:offs[k],length:step});if(r.modified!==first.modified){moved=true;return;}parts[k+1]=b64ToBytes(r.base64);}};
+    const worker=async()=>{while(i<offs.length&&!moved){const k=i++;const r=await api('read',{path,offset:offs[k],length:step},{bg:true});if(r.modified!==first.modified){moved=true;return;}parts[k+1]=b64ToBytes(r.base64);if(prog)prog.done++;}};
     await Promise.all([worker(),worker(),worker()]);
     if(moved)continue; /* the file changed mid-download (Drive sync); start again */
     const all=new Uint8Array(size);let o=0;for(const p of parts){all.set(p,o);o+=p.length;}
@@ -406,13 +415,15 @@ async function fetchChunked(path,head){
   throw new GateError('the file kept changing while downloading: '+path);
 }
 /* fetch a batch fresh from the vault; big or binary files come down in chunks */
-async function fetchFiles(paths,onEach){
+/* fg:true for the sync's own reads (state files), which count towards the status line; everything else is background */
+async function fetchFiles(paths,onEach,{fg=false,prog=null}={}){
   const out={};if(!paths.length)return out;
   for(let i=0;i<paths.length;i+=12){
-    const r=await api('readMany',{paths:paths.slice(i,i+12)});
+    const r=await api('readMany',{paths:paths.slice(i,i+12)},{bg:!fg});
+    if(prog)Object.values(r.files).forEach(f=>{prog.total+=f.chunked?Math.max(1,Math.ceil((f.size||0)/CHUNK)):1;if(!f.chunked)prog.done++;});
     await Promise.all(Object.entries(r.files).map(async([p,f])=>{
       if(f.error){out[p]={error:f.error};onEach&&onEach(p);return;}
-      const e=f.chunked?await fetchChunked(p,f):entryFrom(f,f.base64!=null?b64ToBytes(f.base64):null);
+      const e=f.chunked?await fetchChunked(p,f,prog):entryFrom(f,f.base64!=null?b64ToBytes(f.base64):null);
       out[p]=await remember(e);onEach&&onEach(p);
     }));
   }
@@ -579,13 +590,15 @@ async function flush(id){
       body={app:'tt',baseModified:s.baseMod,patch};
     }else body={app:'ss',baseModified:s.baseMod,state:snap};
     const r=await api('save',body);
-    s.base=r.state;s.baseMod=r.modified;lastSync=Date.now();s.retry=0;
+    s.base=r.state;s.baseMod=r.modified;lastSync=Date.now();s.retry=0;s.err=null;
     await remember({path:a.state,modified:r.modified,mime:'application/json',text:JSON.stringify(r.state)});
     if(s.local===snap){
       s.local=null;await DB.del('kv','local:'+id);
       if(canon(r.state)!==s.appCanon)pushState(a,r.state);   /* the other machine's changes, merged in */
     }else s.again=true;
   }catch(e){
+    /* hidden mid-save: not sent yet, no error; coming back to the app resends it */
+    if(e instanceof Suspended)return;
     s.retry=Math.min((s.retry||0)+1,6);
     if(!(e instanceof NetError)){console.warn('shell: save failed',e);s.err=String(e.message||e);}
     clearTimeout(s.rt);s.rt=setTimeout(()=>flush(id),Math.min(120000,5000*2**s.retry));
@@ -608,7 +621,7 @@ async function flushLogs(){
   try{
     while(LOGQ.length){
       const q=LOGQ[0];
-      try{await api('appendLog',{file:q.file,entry:q.entry});}
+      try{await api('appendLog',{file:q.file,entry:q.entry});lastSync=Date.now();}
       catch(e){if(e instanceof NetError)break;console.warn('shell: error log refused',e);toast('Could not write '+q.file.split('/').pop()+': '+(e.message||e));}
       LOGQ.shift();await DB.put('kv','logs',LOGQ);
       try{const f=await fetchFiles([q.file]);if(f[q.file]&&!f[q.file].error)APPS.filter(b=>b.kind==='ss').forEach(b=>sendLogs(b));}catch(e){}
@@ -619,8 +632,10 @@ const pending=()=>Object.values(SYNC).filter(s=>s.local).length+LOGQ.length;
 function syncLine(){
   const b=$('#status');if(!b)return;const n=pending(),busy=Object.values(SYNC).some(s=>s.inflight);
   let txt,cls='';
+  const ch=`${n} change${n>1?'s':''} waiting`;
   if(!GK)txt='Not connected';
-  else if(NET.down||!navigator.onLine){txt=n?`Offline · ${n} change${n>1?'s':''} waiting`:'Offline · showing your last copy';cls='warn';}
+  else if(!navigator.onLine){txt=n?'Offline · '+ch:'Offline · showing your last copy';cls='warn';}
+  else if(NET.fails>=2){txt=n?'Can\'t reach the vault · '+ch:'Can\'t reach the vault · retrying';cls='warn';}
   else if(busy)txt='Saving';
   else if(n&&Object.values(SYNC).some(s=>s.err&&s.local)){txt=`Not saved yet · ${n} change${n>1?'s':''} kept on this phone`;cls='bad';}
   else if(n)txt=`${n} change${n>1?'s':''} waiting`;
@@ -741,6 +756,7 @@ async function sendPg(a){
   const W=WIN[a.id];if(!W)return;
   try{
     const ps=pgPaths(a);
+    try{await pgDownload();}catch(e){}
     const es=[];for(const p of ps)es.push(await getFile(p));
     const [bundle,wasm,data,initdb]=[es[0].text,es[1].buf.slice(0),es[2].buf.slice(0),es[3].buf.slice(0)];
     post(W,{type:'ss-pg',bundle,wasm,data,initdb},[wasm,data,initdb]);
@@ -749,10 +765,25 @@ async function sendPg(a){
     post(W,{type:'ss-pg',error:e instanceof NetError?'The PostgreSQL engine has not been downloaded to this phone yet; it needs a connection the first time.':'PGlite files are missing: '+(e.message||e)});
   }
 }
+const PG={state:'unknown',done:0,total:0,err:''};
+function pgDownload(){
+  if(pgDownload.p)return pgDownload.p;
+  pgDownload.p=(async()=>{
+    const a=APPS.find(x=>x.kind==='ss');if(!a)return;
+    const miss=[];for(const p of pgPaths(a))if(!(await DB.get('files',p)))miss.push(p);
+    if(!miss.length){PG.state='ready';return;}
+    if(!GK)throw new GateError('not connected');
+    Object.assign(PG,{state:'downloading',done:0,total:0,err:''});sheetRefresh();
+    const prog={done:0,total:0},tick=setInterval(()=>{PG.done=prog.done;PG.total=prog.total;sheetRefresh();},700);
+    try{await fetchFiles(miss,null,{prog});PG.state='ready';}
+    catch(e){PG.state='paused';PG.err=e.message||String(e);throw e;}
+    finally{clearInterval(tick);PG.done=prog.done;PG.total=prog.total;sheetRefresh();}
+  })().finally(()=>{pgDownload.p=null;});
+  return pgDownload.p;
+}
 async function prefetchPg(){
-  const a=APPS.find(x=>x.kind==='ss');if(!a||!GK||!navigator.onLine)return;
-  try{const miss=[];for(const p of pgPaths(a))if(!(await DB.get('files',p)))miss.push(p);if(miss.length)await fetchFiles(miss);}
-  catch(e){console.warn('shell: PGlite prefetch stopped',e);}
+  if(!GK||!navigator.onLine)return;
+  try{await pgDownload();}catch(e){if(!(e instanceof Suspended))console.warn('shell: SQL engine download paused',e);}
 }
 
 /* ══ Markdown: Obsidian's syntax on top of marked (wikilinks, embeds, callouts, highlights, maths kept for KaTeX) ══ */
@@ -816,7 +847,7 @@ function mdToDom(md){
 async function ensureIndex(force){
   if(INDEX&&!force)return INDEX;
   if(!force){const c=await DB.get('kv','index');if(c){INDEX=c;return INDEX;}}
-  try{const r=await api('index');INDEX=r.files.map(f=>f[0]);await DB.put('kv','index',INDEX);INDEX.at=Date.now();}catch(e){INDEX=INDEX||[];}
+  try{const r=await api('index',{},{bg:true});INDEX=r.files.map(f=>f[0]);await DB.put('kv','index',INDEX);INDEX.at=Date.now();}catch(e){INDEX=INDEX||[];}
   return INDEX;
 }
 async function resolveLink(lp,from){
@@ -1032,14 +1063,14 @@ async function loadApp(a,{force=false}={}){
     W.ready=false;W.stale=false;W.f.srcdoc=await assemble(a);
   }catch(e){
     console.warn('shell: could not open',a.id,e);
-    waitMsg(W,e instanceof NetError?'Not on this phone yet, and there is no connection.':'Could not load it: '+(e.message||e),true);
+    waitMsg(W,e instanceof NetError?(navigator.onLine?'Couldn\'t reach the vault to fetch it ('+e.message+').':'Not on this phone yet, and there is no connection.'):'Could not load it: '+(e.message||e),true);
   }
 }
 async function loadState(a){
   if(!a.state)return;
   const s=SYNC[a.id]=SYNC[a.id]||{};
   let e=await cached(a.state);
-  if(!e&&GK)e=(await fetchFiles([a.state]))[a.state];   /* a NetError here stops the app opening: it must never start blank */
+  if(!e&&GK)e=(await fetchFiles([a.state],null,{fg:true}))[a.state];   /* a NetError here stops the app opening: it must never start blank */
   if(e&&e.text!=null&&!s.base){try{s.base=JSON.parse(e.text);s.baseMod=e.modified;}catch(err){}}
   if(!s.base&&!(e&&e.error&&/^missing/.test(e.error)))throw new GateError('could not read '+a.state);
   if(s.local===undefined)s.local=(await DB.get('kv','local:'+a.id))||null;
@@ -1051,19 +1082,21 @@ function reloadSoon(a){const W=WIN[a.id];if(!W)return;if(mode==='app'&&APPS[idx]
 /* ══ keeping current: one cheap stat call for every file in play, then fetch only what moved ══ */
 let revalT=0,lastNotes=0;
 async function revalidate(){
-  if(!GK||revalidate.busy)return;revalidate.busy=true;
+  if(!GK)return;
+  if(revalidate.busy&&Date.now()-revalidate.started<TIMEOUTS.fg+5000)return;
+  const gen=revalidate.gen=(revalidate.gen||0)+1;revalidate.busy=true;revalidate.started=Date.now();
   try{
     const codeBy={};for(const a of APPS)codeBy[a.id]=await codePaths(a,{fetchMissing:false});
     const logs=[...new Set(Object.values(WIN).flatMap(w=>w.logFiles||[]))];
     const paths=[...new Set([...Object.values(codeBy).flat(),...APPS.map(a=>a.state).filter(Boolean),...logs])];
-    const r=await api('stat',{paths});
+    const r=await api('stat',{paths});lastSync=Date.now();
     const changed=[];
     for(const p of paths){const m=r.modified[p];if(!m)continue;const c=await cached(p);if(!c||c.modified!==m)changed.push(p);}
     for(const a of APPS){
       if(a.state&&changed.includes(a.state)){
         const s=SYNC[a.id];if(!s)continue;
         if(s.local)flush(a.id);          /* the save merges the server's version and pushes the union back */
-        else{const f=(await fetchFiles([a.state]))[a.state];if(f&&f.text!=null){try{const st=JSON.parse(f.text);s.base=st;s.baseMod=f.modified;
+        else{const f=(await fetchFiles([a.state],null,{fg:true}))[a.state];if(f&&f.text!=null){try{const st=JSON.parse(f.text);s.base=st;s.baseMod=f.modified;
           if(canon(st)!==s.appCanon)pushState(a,st);}catch(e){}}}
       }
     }
@@ -1077,23 +1110,30 @@ async function revalidate(){
     if(lchanged.length){await fetchFiles(lchanged);APPS.filter(b=>b.kind==='ss').forEach(b=>sendLogs(b));}
     if(Date.now()-lastNotes>3*60e3)await refreshNotes();
     if(!INDEX||!INDEX.at||Date.now()-INDEX.at>15*60e3)ensureIndex(true);
-    if(!lastSync)lastSync=Date.now();
     flushLogs();Object.keys(SYNC).forEach(id=>SYNC[id].local&&flush(id));
+    if(PG.state!=='ready'&&!pgDownload.p&&booted)setTimeout(prefetchPg,3000);   /* a paused SQL engine download picks up again */
   }catch(e){if(!(e instanceof NetError))console.warn('shell: revalidate',e);}
-  finally{revalidate.busy=false;syncLine();}
+  finally{if(revalidate.gen===gen)revalidate.busy=false;syncLine();sheetRefresh();}
 }
 async function refreshNotes(){
-  try{const r=await api('notes');lastNotes=Date.now();
+  try{const r=await api('notes',{},{bg:true});lastNotes=Date.now();
     if(canon(r.notes)!==canon(NOTES)){NOTES=r.notes;await DB.put('kv','notes',NOTES);
       APPS.filter(a=>a.kind==='tt').forEach(a=>{const W=WIN[a.id];if(W&&W.ready)post(W,{type:'tt-notes',notes:NOTES});});}}
   catch(e){if(!(e instanceof NetError))console.warn('shell: notes',e);}
 }
 function schedule(){clearTimeout(revalT);if(document.visibilityState==='visible')revalT=setTimeout(()=>{revalidate();schedule();},90e3);}
+/* after a failed sync, try again soon rather than in 90s */
+function soon(){clearTimeout(revalT);if(document.visibilityState==='visible')revalT=setTimeout(()=>{revalidate();schedule();},NET.fails>=2?20e3:8e3);}
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'){revalidate();schedule();renderHead();if(mode==='stack')renderLabels();Object.keys(WIN).forEach(id=>wantGlance(id,300));}
-  else Object.keys(SYNC).forEach(id=>{const s=SYNC[id];if(s.local){clearTimeout(s.t);flush(id);}});
+  hideEpoch++;
+  if(document.visibilityState==='visible'){
+    abortStale();                                   /* cut off on hide: dropped quietly, resent below */
+    revalidate.busy=false;revalidate.gen=(revalidate.gen||0)+1;
+    revalidate();schedule();renderHead();if(mode==='stack')renderLabels();Object.keys(WIN).forEach(id=>wantGlance(id,300));
+  }
+  else Object.keys(SYNC).forEach(id=>{const s=SYNC[id];if(s.local){clearTimeout(s.t);flush(id);}});   /* best effort; iOS may cut it off */
 });
-addEventListener('online',()=>{NET.down=false;syncLine();revalidate();});
+addEventListener('online',()=>{NET.fails=0;syncLine();revalidate();});
 addEventListener('offline',syncLine);
 
 /* ══ home: the card stack (ported from the approved home-final mock) ══ */
@@ -1101,7 +1141,7 @@ const SHELL={};
 let mode='stack',idx=0;
 const LAB_H=96,STATUS_H=46;
 function geo(){
-  const{W,H}=screenBox(),ins=insets(),hb=$('#hd').getBoundingClientRect().bottom;
+  const{W,H}=viewBox(),ins=insets(),hb=$('#hd').getBoundingClientRect().bottom;
   const top=hb+18,avail=H-top-LAB_H-Math.max(ins.b,6)-STATUS_H;
   const s=Math.max(.25,Math.min(avail/H,(W-128)/W)),cw=W*s,ch=H*s,gap=Math.max(14,W*.04);
   return{W,H,s,cw,ch,top,gap,x0:(W-cw)/2};
@@ -1128,7 +1168,7 @@ function layoutGrab(){
   const t=insets().t+grabBand(),h=Math.min(44,t),G=$('#grab');G.style.top=(t-h)+'px';G.style.height=h+'px';
   if(APPS[idx])G.style.setProperty('--grab',look(APPS[idx]).muted);
 }
-SHELL.repaint=()=>{applyFrame();renderLabels();layoutGrab();if(mode==='app'){document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);}};
+SHELL.repaint=()=>{renderLabels();layoutGrab();if(mode==='app'){document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);}};
 
 /* ── the one authored transition: the card grows into the app, and the app shrinks back into its card ── */
 let settleT=0;
@@ -1226,9 +1266,9 @@ document.addEventListener('keydown',e=>{
   if(mode!=='stack'||$('#sheet').classList.contains('open')||$('#setup').classList.contains('on'))return;
   if(e.key==='ArrowRight'||e.key==='ArrowLeft'){idx=Math.max(0,Math.min(APPS.length-1,idx+(e.key==='ArrowRight'?1:-1)));document.body.classList.add('anim');place();$(`.lab[data-i="${idx}"]`).focus({preventScroll:true});}
 });
-function onGeometry(){applyFrame();place();layoutGrab();Object.values(WIN).forEach(w=>pushInsets(w.app));}
+function onGeometry(){place();layoutGrab();Object.values(WIN).forEach(w=>pushInsets(w.app));}
 addEventListener('resize',onGeometry);addEventListener('orientationchange',()=>setTimeout(onGeometry,250));
-applyFrame();
+if(window.visualViewport)visualViewport.addEventListener('resize',onGeometry);
 MQ.addEventListener('change',()=>{if(TP)return;applyTheme();
   Object.values(WIN).forEach(W=>{paintWin(W);if(W.ready)themeMsgs(W.app).forEach(m=>post(W,m));});SHELL.repaint();});
 setInterval(()=>{if(mode==='stack'&&document.visibilityState==='visible')renderLabels();},60e3);
@@ -1248,9 +1288,9 @@ $('#su-f').addEventListener('submit',async e=>{
   if(!/^https?:\/\/\S+$/.test(url)){err.textContent='That URL doesn\'t look right. It starts with https:// and ends in /exec.';$('#su-url').focus();return;}
   if(!key){err.textContent='Paste the key too. setup() printed it in the script\'s execution log.';$('#su-key').focus();return;}
   go.disabled=true;go.textContent='Connecting';
-  try{await api('ping',{},{cfg:{url,key},timeout:30000});}
+  try{await api('ping',{},{cfg:{url,key},timeout:30000});NET.fails=0;}
   catch(ex){go.disabled=false;go.textContent='Connect';
-    err.textContent=ex instanceof NetError?'Couldn\'t reach that URL. Check it\'s the web app URL ending in /exec and that you\'re online.'
+    err.textContent=ex instanceof NetError?'Couldn\'t reach that URL ('+ex.message+'). Check it\'s the web app URL ending in /exec and that you\'re online.'
       :/bad key/.test(ex.message)?'The gatekeeper didn\'t accept that key. Copy it again from the execution log.':ex.message;return;}
   const changed=!GK||GK.url!==url||GK.key!==key;
   GK={url,key};localStorage.setItem(CFG_KEY,JSON.stringify(GK));
@@ -1271,18 +1311,33 @@ async function firstFetch(){
     await refreshNotes();
   }catch(e){txt.textContent='Some files didn\'t come down. The phone will keep trying.';await sleep(1200);}
 }
+function pgLine(){
+  if(PG.state==='downloading')return PG.total?`downloading ${Math.min(PG.done,PG.total)} of ${PG.total}`:'starting the download';
+  if(PG.state==='ready')return'on this phone';
+  if(PG.state==='paused')return'download paused, it picks up again on its own';
+  return'not downloaded yet';
+}
+function connBody(){
+  const n=pending(),host=GK?(()=>{try{return new URL(GK.url).host;}catch(e){return GK.url;}})():'not set';
+  const E=NET.lastErr,showErr=E&&(!lastSync||E.at>=lastSync-1000);
+  return `<p class="sheet-lead">${esc($('#status span').textContent)}.</p>
+  <div class="rowinfo"><div><span>Gatekeeper</span><span>${esc(host)}</span></div>
+  <div><span>Last synced</span><span class="num">${lastSync?clock(new Date(lastSync)):'not yet'}</span></div>
+  <div><span>Waiting to save</span><span class="num">${n?n+' change'+(n>1?'s':''):'nothing'}</span></div>
+  ${showErr?`<div><span>Last try ${esc(clock(new Date(E.at)))}</span><span>${esc(E.msg)}</span></div>`:''}
+  <div><span>SQL engine</span><span class="num" id="cx-pg">${esc(pgLine())}</span></div></div>`;
+}
+function sheetRefresh(){const el=$('#cx-info');if(el&&$('#sheet').classList.contains('open'))el.innerHTML=connBody();}
 $('#status').addEventListener('click',()=>{
   SH.hist=[];sheetOpen('Connection');
-  const n=pending(),host=GK?(()=>{try{return new URL(GK.url).host;}catch(e){return GK.url;}})():'not set';
-  sheetBody(`<p class="sheet-lead">${esc($('#status span').textContent)}.</p>
-  <div class="rowinfo"><div><span>Gatekeeper</span><span>${esc(host)}</span></div>
-  <div><span>Waiting to save</span><span class="num">${n?n+' change'+(n>1?'s':''):'nothing'}</span></div>
-  <div><span>Last synced</span><span class="num">${lastSync?clock(new Date(lastSync)):'not yet'}</span></div></div>
+  sheetBody(`<div id="cx-info">${connBody()}</div>
   <div class="acts"><button class="btn quiet" type="button" id="cx-sync">Sync now</button>
   <button class="btn quiet" type="button" id="cx-edit">Change the URL or key</button>
   <button class="btn quiet" type="button" id="cx-reload">Reload both apps</button>
   <button class="btn quiet danger" type="button" id="cx-forget">Forget this phone</button></div>`);
-  $('#cx-sync').addEventListener('click',async()=>{$('#cx-sync').textContent='Syncing';await revalidate();sheetClose();toast(NET.down?'No connection. Your changes stay on this phone.':'Synced');});
+  $('#cx-sync').addEventListener('click',async()=>{const b=$('#cx-sync');b.textContent='Syncing';b.disabled=true;
+    NET.fails=0;revalidate.busy=false;await revalidate();b.textContent='Sync now';b.disabled=false;sheetRefresh();
+    toast(!navigator.onLine?'No connection. Your changes stay on this phone.':NET.fails?'Couldn\'t reach the vault. Your changes stay on this phone.':'Synced');});
   $('#cx-edit').addEventListener('click',()=>{sheetClose();showSetup(true);});
   $('#cx-reload').addEventListener('click',()=>{sheetClose();APPS.forEach(a=>loadApp(a));});
   $('#cx-forget').addEventListener('click',async()=>{
