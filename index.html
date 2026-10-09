@@ -19,8 +19,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
 <script src="vendor/marked.min.js" defer></script>
 <!-- The phone shell. Home IS the switcher: every study app is a live card, exactly as you left it, laid side by side
-     with the next one peeking in. Tap a card to step into it. Two ways back, one gesture: pinch inside any app, or drag
-     the grab bar under the Dynamic Island down; either way the app shrinks back into its card under your fingers.
+     with the next one peeking in. Tap a card to step into it. Pinch inside any app to go back: it shrinks into its card
+     under your fingers. Swipe sideways on an app's tab bar to go straight to the next app.
      The shell plays the Obsidian plugins' part: it loads each app's real file from the vault (through the gatekeeper),
      runs it in the same sandboxed srcdoc frame, and answers the same messages. See system/phone.md. -->
 <style>
@@ -76,7 +76,7 @@ h1,h2,h3,.serif{font-family:var(--font-display);font-weight:600;letter-spacing:-
 #wins{position:fixed;inset:0;pointer-events:none;z-index:10;overflow:hidden;}
 /* the blur cap: iOS 27 blurs and fades the top of a home-screen app's page, from the status bar to a little below the
    top inset. Blurring a flat colour shows nothing, so while an app is open a solid band of the app's own top colour sits
-   over that zone, and the app's header starts below it. Above the app, below the grab band; never takes a touch.
+   over that zone, and the app's header starts below it. Above the app, below the tab-bar swipe zone; never takes a touch.
    Hidden on the home stack and while an app is being shrunk home. Its depth is BLUR_CLEAR (script). */
 #cap{position:fixed;left:0;right:0;top:0;height:var(--capH,0px);background:var(--capc,var(--bg));z-index:35;pointer-events:none;}
 body.stack #cap,body.gz #cap{display:none;}
@@ -101,7 +101,8 @@ html.sim .clock{display:block;position:fixed;top:17px;left:calc(50% - 170px);fon
 body.anim .win{transition:transform .46s var(--ease),border-radius .46s var(--ease),box-shadow .3s;}
 body.stack .win{box-shadow:0 18px 50px rgba(40,36,30,.16),0 0 0 2px rgba(40,36,30,.07);}
 :root[data-theme="dark"] body.stack .win{box-shadow:0 0 0 2px #2c2c2c;}
-body.stack .win iframe,body.held .win iframe{pointer-events:none;}  /* a held grab bar keeps every move, even over an app frame */
+body.stack .win iframe,body.held .win iframe{pointer-events:none;}  /* a held swipe keeps every move, even over an app frame */
+body.slide .win{transition:transform .32s var(--ease);}
 #labels{position:fixed;inset:0;z-index:15;pointer-events:none;transition:opacity .2s;}
 body:not(.stack) #labels{opacity:0;transition:opacity .12s;}
 .lab{position:absolute;left:0;top:0;display:block;text-align:left;padding:0 2px;pointer-events:none;}
@@ -111,24 +112,23 @@ body:not(.stack) #labels{opacity:0;transition:opacity .12s;}
 body.anim .lab{transition:transform .46s var(--ease);}
 #deck{position:fixed;inset:0;z-index:20;display:none;touch-action:pan-y;}
 body.stack #deck{display:block;}
-/* the grab band: a full-width, see-through 44px strip laid over the top of the open app, starting just below the
-   status bar (iOS 27 keeps the strip beside the Dynamic Island for itself, so touches there never reach the page).
-   A downward drag that starts here takes the app home; a tap, a sideways move or an upward move is handed to the
-   app underneath, so its header controls keep working. Only the thin bar near its top shows. */
-#grab{position:fixed;left:0;right:0;z-index:40;display:none;touch-action:none;}
-body:not(.stack) #grab{display:block;}
-#grab i{position:absolute;left:50%;top:5px;width:38px;height:5px;margin-left:-19px;border-radius:3px;background:var(--grab,#6a635b);opacity:.5;transition:opacity .15s,transform .2s var(--ease);}
-#grab.held i{opacity:.8;transform:scaleX(1.2);}
-#grab:focus-visible{outline:none;}
-#grab:focus-visible i{opacity:1;outline:2px solid var(--grab);outline-offset:3px;}
-/* sync line: the one quiet word on how the phone stands with the vault; tap it for the connection sheet */
-#status{position:fixed;left:50%;bottom:calc(var(--pb,var(--sab)) + 2px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
-  font-size:13px;color:var(--text3);white-space:nowrap;border-radius:99px;transition:opacity .2s;}
-#status i{width:7px;height:7px;border-radius:50%;background:var(--rule3);flex:none;}
-#status.warn{color:var(--duesoon);} #status.warn i{background:#f0a81c;}
-#status.bad{color:var(--overdue);} #status.bad i{background:var(--overdue);}
-#status:active{background:var(--surface-dim);}
-body:not(.stack) #status{opacity:0;pointer-events:none;}
+/* the tab-bar swipe: a see-through zone laid exactly over the open app's own tab bar (its position comes from the app
+   frame, through the bridge). A sideways stroke there switches apps: the open app slides out and its neighbour in
+   apps.json order slides in under the finger. A tap goes through to the tab underneath; an up or down stroke too. */
+#swz{position:fixed;left:0;right:0;z-index:40;display:none;touch-action:none;}
+body:not(.stack) #swz.on{display:block;}
+/* the hint: a quiet chevron in the tab bar's outer edge, on the side where another app is; a tap on it switches too.
+   It sits on the empty margin of the outermost tab, so the tabs themselves never move */
+#swz .hint{position:absolute;width:12px;height:12px;color:var(--hint,#6a635b);opacity:.55;pointer-events:none;transition:opacity .15s;}
+#swz .hint svg{width:12px;height:12px;stroke-width:2;display:block;}
+#swz .hint.l{left:calc(5px + var(--sal));} #swz .hint.r{right:calc(5px + var(--sar));}
+#swz .hint[hidden]{display:none;}
+body.swiping #swz .hint{opacity:0;}
+/* keyboard has no pinch or swipe: Tab reaches this, Enter takes the app home */
+#homekey{position:fixed;left:calc(10px + var(--sal));top:calc(var(--capH,0px) + 8px);z-index:45;min-height:44px;padding:0 16px;border-radius:10px;
+  background:var(--surface);border:1px solid var(--border2);font-weight:600;transform:translateY(-300%);opacity:0;}
+#homekey:focus-visible{transform:none;opacity:1;}
+body.stack #homekey{display:none;}
 @media (orientation:landscape) and (max-height:520px){#hd{padding-top:12px;}}
 @media (max-width:380px){#hd h1{font-size:24px;}.lab .nm{font-size:19px;}.lab .g{font-size:13.5px;}}
 
@@ -233,7 +233,8 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 <div id="cap" aria-hidden="true"></div>
 <div id="labels" role="list" aria-label="Apps"></div>
 <div id="deck" aria-hidden="true"></div>
-<div id="grab" role="button" tabindex="0" aria-label="Back to all apps"><i></i></div>
+<div id="swz" aria-hidden="true"><span class="hint l" hidden><svg viewBox="0 0 12 12"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg></span><span class="hint r" hidden><svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6 4.5 9.5"/></svg></span></div>
+<button id="homekey" type="button">Back to all apps</button>
 <button id="status" type="button" aria-live="polite"><i aria-hidden="true"></i><span>Starting</span></button>
 
 <section id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t" aria-hidden="true">
@@ -268,7 +269,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 'use strict';
 /* ══ Shell core ══
    URL params (testing and screenshots only): theme=light|dark · sim=1 (iPhone 15 Pro Max safe areas) · open=<app id>
-   (start inside an app) · drag=0.4 (freeze a grab-bar drag part-way, with open=) */
+   (start inside an app) · drag=0.4 (freeze a pinch part-way, with open=) */
 const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
@@ -484,11 +485,34 @@ const pgPaths=a=>['pglite.bundle.js','pglite.wasm','pglite.data','initdb.wasm'].
 function shellBridge(KIND,INS){
   var css=document.createElement('style');css.id='shell-insets';(document.head||document.documentElement).appendChild(css);
   function px(n){return Math.max(0,+n||0)+'px!important';}
-  function insets(i){css.textContent=KIND==='tt'
+  /* the two tab bars, made one: the same 60px (plus the bottom inset), the same 28px icon row 8px below the top rule,
+     the same 12/14px label, so swiping from one app to the other lines up exactly. Each keeps its own colours and its
+     own active-tab mark. Landscape keeps the apps' own compact bars. */
+  var LABEL="font-family:'DM Sans',system-ui,-apple-system,sans-serif!important;font-size:12px!important;line-height:14px!important;";
+  var TABS='@media not all and (orientation:landscape) and (max-height:520px){'+(KIND==='tt'
+    ?'body.phone{--ph-tabh:60px!important}body.phone .ph-tabs{box-sizing:border-box!important;height:calc(60px + var(--ph-sab))!important}'
+     +'body.phone .ph-tab{box-sizing:border-box!important;height:100%!important;min-height:0!important;justify-content:flex-start!important;padding:7px 0 0!important;gap:2px!important}'
+     +'body.phone .ph-tab .ph-tic{height:28px!important}body.phone .ph-tab svg{width:22px!important;height:22px!important}body.phone .ph-tab span.l{'+LABEL+'}'
+    :'html.phone #phTabs{box-sizing:border-box!important;height:calc(60px + var(--sa-b))!important;align-items:stretch!important}html.phone #phTabs .in{height:100%!important}'
+     +'html.phone #phTabs .tab{box-sizing:border-box!important;height:100%!important;min-height:0!important;justify-content:flex-start!important;padding:7px 2px 0!important;gap:2px!important}'
+     +'html.phone #phTabs .tab>.mico{display:grid!important;place-items:center!important;height:28px!important;flex:none!important}'
+     +'html.phone #phTabs .tab>.mico svg{width:22px!important;height:22px!important}html.phone #phTabs .tab>span:not(.bd):not(.mico){'+LABEL+'}'
+     +'html.phone body:not(.inq) #main{padding-bottom:calc(var(--sa-b) + 92px)!important}')+'}';
+  function insets(i){css.textContent=(KIND==='tt'
     ?'body.phone{--ph-sat:'+px(i.t)+';--ph-sab:'+px(i.b)+';--ph-sal:'+px(i.l)+';--ph-sar:'+px(i.r)+'}'
-    :'html.phone{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}';}
-  insets(INS);
+    :'html.phone{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}')+TABS;setTimeout(tbReport,60);}
+  /* where the tab bar is (or that it's hidden, as on Study Space's question screen), so the shell can lay its swipe zone over it */
+  var TSEL=KIND==='tt'?'.ph-tabs':'#phTabs',tbLast='',tbQ=0;
+  function tbReport(){tbQ=0;var el=document.querySelector(TSEL),m=null;
+    if(el){var r=el.getBoundingClientRect(),cs=getComputedStyle(el);
+      if(r.height>0&&r.bottom>0&&cs.display!=='none'&&cs.visibility!=='hidden'){var ic=el.querySelector('svg'),ir=ic&&ic.getBoundingClientRect();
+        m={top:r.top,bottom:r.bottom,iconY:ir?ir.top+ir.height/2:r.top+r.height/2};}}
+    var k=JSON.stringify(m);if(k!==tbLast){tbLast=k;post({type:'shell-tabbar',rect:m});}}
+  function tbSoon(){if(!tbQ)tbQ=requestAnimationFrame(tbReport);}
+  new MutationObserver(tbSoon).observe(document.documentElement,{attributes:true,subtree:true,childList:true,attributeFilter:['class','hidden','style']});
+  addEventListener('resize',tbSoon);setInterval(tbReport,1000);
   function post(m){try{parent.postMessage(m,'*');}catch(e){}}
+  insets(INS);
   function ttGlance(){
     if(typeof getDay!=='function'||typeof KINDS==='undefined'||typeof SEMESTER==='undefined')return null;
     var p2=function(n){return String(n).padStart(2,'0');},isoOf=function(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());};
@@ -527,7 +551,7 @@ function shellBridge(KIND,INS){
     subs.sort(function(a,b){return(b.title===active)-(a.title===active);});
     return{subs:subs,active:active};
   }
-  /* touches that landed on the shell's grab band but were not a drag home: replayed here on whatever is under them */
+  /* touches that landed on the shell's tab-bar zone but were not an app switch: replayed here on whatever is under them */
   var pt=null,ly=0;
   function pe(type,x,y,el){try{el.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,clientX:x,clientY:y,
     pointerId:41,pointerType:'touch',isPrimary:true,button:0,buttons:type==='pointerup'||type==='pointercancel'?0:1}));}catch(err){}}
@@ -703,6 +727,7 @@ addEventListener('message',e=>{
   if(d.type==='shell-pinch'){if(mode==='app'&&APPS[idx]===a)SHELL.pinch(d.phase,d.r);return;}
   if(d.type==='shell-wheel'){if(mode==='app'&&APPS[idx]===a)wheelPinch(+d.dy||0);return;}
   if(d.type==='shell-glance'){gotGlance(a,d.model);return;}
+  if(d.type==='shell-tabbar'){W.tabbar=d.rect||null;if(mode==='app'&&APPS[idx]===a&&!sw)layoutSwipe();return;}
   if(a.kind==='tt')ttMsg(W,a,d);else if(a.kind==='ss')ssMsg(W,a,d);
 });
 function ttMsg(W,a,d){
@@ -941,13 +966,13 @@ let lastFocus=null;
 function sheetOpen(title,sub){
   const s=$('#sheet');
   $('#sh-t').innerHTML=esc(title)+(sub?`<small>${esc(sub)}</small>`:'');
-  if(!s.classList.contains('open')){lastFocus=document.activeElement;s.classList.add('open');s.setAttribute('aria-hidden','false');$('#grab').style.visibility='hidden';}
+  if(!s.classList.contains('open')){lastFocus=document.activeElement;s.classList.add('open');s.setAttribute('aria-hidden','false');$('#swz').style.visibility='hidden';}
   $('#sh-back').hidden=SH.hist.length<2;
   setTimeout(()=>$('#sh-b').focus({preventScroll:true}),RM.matches?0:60);
 }
 function sheetClose(){
   const s=$('#sheet');if(!s.classList.contains('open'))return;
-  s.classList.remove('open');s.setAttribute('aria-hidden','true');$('#grab').style.visibility='';
+  s.classList.remove('open');s.setAttribute('aria-hidden','true');$('#swz').style.visibility='';
   SH.hist=[];setTimeout(()=>{if(!s.classList.contains('open')){$('#sh-b').innerHTML='';SH.urls.forEach(u=>URL.revokeObjectURL(u));SH.urls=[];}},500);
   const W=mode==='app'&&WIN[APPS[idx]&&APPS[idx].id];
   if(W)try{W.f.focus();}catch(e){}else if(lastFocus&&lastFocus.focus)lastFocus.focus();
@@ -1209,11 +1234,18 @@ function renderLabels(){
   if(focused>=0){const b=$(`.lab[data-i="${focused}"]`);b&&b.focus({preventScroll:true});}
   place();
 }
-function layoutGrab(){
-  const G=$('#grab');G.style.top=insets().t+'px';G.style.height='44px';
-  if(APPS[idx])G.style.setProperty('--grab',look(APPS[idx]).muted);
+/* the swipe zone sits exactly on the open app's tab bar, as the app reports it; no tab bar showing, no zone */
+function layoutSwipe(){
+  const Z=$('#swz'),a=APPS[idx],W=a&&WIN[a.id],tb=W&&W.tabbar;
+  if(mode!=='app'||!tb){Z.classList.remove('on');return;}
+  /* an open app's frame fills the page from 0,0 at scale 1, so its tab bar's frame coordinates are page coordinates */
+  Z.style.top=tb.top+'px';Z.style.height=(tb.bottom-tb.top)+'px';Z.classList.add('on');
+  Z.style.setProperty('--hint',look(a).muted);
+  const cy=tb.iconY-tb.top-6;
+  $('#swz .hint.l').style.top=cy+'px';$('#swz .hint.r').style.top=cy+'px';
+  $('#swz .hint.l').hidden=!APPS[idx-1];$('#swz .hint.r').hidden=!APPS[idx+1];
 }
-SHELL.repaint=()=>{renderLabels();layoutGrab();if(mode==='app'){document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);}};
+SHELL.repaint=()=>{renderLabels();layoutSwipe();if(mode==='app'){document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);}};
 
 /* ── the one authored transition: the card grows into the app, and the app shrinks back into its card ── */
 let settleT=0;
@@ -1223,13 +1255,13 @@ function openApp(i){
   idx=i;const a=APPS[i],W=ensureWin(a);W.el.classList.add('on');
   document.body.classList.add('anim');document.body.classList.remove('stack');mode='app';
   W.el.style.zIndex=30;APPS.forEach((b,j)=>{const w=WIN[b.id];if(w&&j!==i)w.el.style.zIndex=11;});
-  place();document.documentElement.style.setProperty('--clock',look(a).ink);layoutGrab();
+  place();document.documentElement.style.setProperty('--clock',look(a).ink);layoutSwipe();
   canvasFor(a);
   settle(()=>{if(mode!=='app')return;APPS.forEach((b,j)=>{const w=WIN[b.id];if(w&&j!==idx)w.el.classList.remove('on');});
-    document.body.classList.remove('anim');try{W.f.focus();}catch(e){}});
+    document.body.classList.remove('anim');layoutSwipe();try{W.f.focus();}catch(e){}});
 }
 function toStack(){
-  mode='stack';canvasFor(null);APPS.forEach(a=>{const w=ensureWin(a);w.el.classList.add('on');});
+  mode='stack';canvasFor(null);layoutSwipe();APPS.forEach(a=>{const w=ensureWin(a);w.el.classList.add('on');});
   document.body.classList.add('anim','stack');document.documentElement.style.removeProperty('--clock');
   renderLabels();APPS.forEach(a=>wantGlance(a.id,500));
   settle(()=>{if(mode==='stack')document.body.classList.remove('anim');
@@ -1237,7 +1269,7 @@ function toStack(){
     const b=$(`.lab[data-i="${idx}"]`);if(b)b.focus({preventScroll:true});});
 }
 
-/* ── one shrink gesture, two ways in (pinch, grab bar): the same scale/position mapping and the same release rules ──
+/* ── the shrink gesture (a pinch inside the app, or ctrl+wheel on a laptop): one scale/position mapping, one set of release rules ──
    p runs 0 (app full screen) → 1 (sitting in its card). A flick decides on its own (down closes, back up reopens);
    otherwise past 22% it settles into the stack and short of that it springs back open. Reduced motion: nothing follows
    the finger, the release alone decides, and the switch is instant. */
@@ -1245,7 +1277,7 @@ const SHRINK_AT=.22,FLICK=.0025;
 let gz=null;
 function shrinkStart(){
   if(mode!=='app'||gz)return false;
-  const t=performance.now();gz={p:0,v:0,lt:t};document.body.classList.remove('anim');document.body.classList.add('gz');canvasFor(null);
+  const t=performance.now();gz={p:0,v:0,lt:t};document.body.classList.remove('anim');document.body.classList.add('gz');canvasFor(null);$('#swz').classList.remove('on');
   APPS.forEach((a,i)=>{if(i===idx)return;const w=ensureWin(a);w.el.classList.add('on');});place();return true;
 }
 function shrinkTo(p){
@@ -1254,14 +1286,13 @@ function shrinkTo(p){
   if(RM.matches&&!gz.force)return;
   const g=geo(),W=WIN[APPS[idx].id],s=1-p*(1-g.s),x=p*cardX(idx,g),y=p*g.top;
   W.el.style.transform=`translate(${x}px,${y}px) scale(${s})`;W.el.style.borderRadius=(p*22/s)+'px';
-  /* the bar belongs to the app: it rides on the shrinking window's top edge */
-  $('#grab').style.transform=`translate(${x+g.W*s/2-g.W/2}px,${y}px)`;
+
 }
 function shrinkEnd(){
-  if(!gz)return;const{p}=gz,v=performance.now()-gz.lt>90?0:gz.v;gz=null;$('#grab').style.transform='';document.body.classList.remove('gz');
+  if(!gz)return;const{p}=gz,v=performance.now()-gz.lt>90?0:gz.v;gz=null;document.body.classList.remove('gz');
   const close=v>FLICK?p>.03:v<-FLICK?false:p>SHRINK_AT;
   if(close){toStack();return;}
-  canvasFor(APPS[idx]);document.body.classList.add('anim');place();settle(()=>{if(mode!=='app')return;document.body.classList.remove('anim');
+  canvasFor(APPS[idx]);layoutSwipe();document.body.classList.add('anim');place();settle(()=>{if(mode!=='app')return;document.body.classList.remove('anim');
     APPS.forEach((a,i)=>{const w=WIN[a.id];if(w&&i!==idx)w.el.classList.remove('on');});});
 }
 SHELL.pinch=(phase,r)=>{
@@ -1269,29 +1300,75 @@ SHELL.pinch=(phase,r)=>{
   else if(phase==='move')shrinkTo((1-(+r||1))/.45);
   else if(phase==='end')shrinkEnd();
 };
-/* the grab band: decide what a touch is from its first 8px of travel. Down: the shrink gesture. Sideways or up: the
-   whole stroke goes to the app (a day swipe, a scroll). No travel: a tap, delivered to whatever is under the finger. */
+/* ── switching apps on the tab bar ──
+   dx follows the finger: the open app slides by dx and its neighbour rides alongside, one screen width away. Release
+   past 30% of the width, or a quick flick that way, commits; anything less springs back. There is no wrap-around: at
+   the first or last app the stroke only gives a little (rubber band). Reduced motion: nothing follows the finger and
+   the release alone decides. */
+let sw=null;
+const SW_COMMIT=.3,SW_FLICK=.45;   /* fraction of the width; px per ms */
+function swStart(){
+  if(mode!=='app'||sw||gz)return false;
+  sw={dx:0,v:0,lt:performance.now()};document.body.classList.remove('anim','slide');document.body.classList.add('swiping');
+  [idx-1,idx+1].forEach(j=>{const b=APPS[j];if(!b)return;const w=ensureWin(b);w.el.classList.add('on');w.el.style.zIndex=30;w.el.style.borderRadius='0px';
+    w.el.style.transform=`translate(${(j-idx)*innerWidth}px,0px) scale(1)`;});
+  return true;
+}
+function swPaint(dx){
+  const W=innerWidth;
+  APPS.forEach((b,j)=>{const w=WIN[b.id];if(!w||Math.abs(j-idx)>1)return;w.el.style.transform=`translate(${dx+(j-idx)*W}px,0px) scale(1)`;w.el.style.borderRadius='0px';});
+}
+function swMove(raw){
+  if(!sw)return;const t=performance.now(),dt=t-sw.lt,n=raw<0?idx+1:idx-1;
+  const dx=APPS[n]?raw:raw*.3;                         /* rubber band at the ends */
+  if(dt>0)sw.v=.6*sw.v+.4*((dx-sw.dx)/dt);sw.dx=dx;sw.lt=t;
+  if(!RM.matches)swPaint(dx);
+}
+function swEnd(){
+  if(!sw)return;const{dx}=sw,v=performance.now()-sw.lt>90?0:sw.v,W=innerWidth;sw=null;
+  const dir=dx<0?1:-1,n=idx+dir;
+  const go=APPS[n]&&dx!==0&&(Math.abs(dx)>W*SW_COMMIT||(Math.abs(v)>SW_FLICK&&Math.sign(v)===Math.sign(dx)));
+  swFinish(go?n:idx);
+}
+function swFinish(n){
+  const from=idx,W=innerWidth;
+  document.body.classList.remove('swiping');
+  if(!RM.matches)document.body.classList.add('slide');
+  idx=n;swPaint(0);                                    /* slide every window to its place around the new idx */
+  if(n!==from){canvasFor(APPS[n]);document.documentElement.style.setProperty('--clock',look(APPS[n]).ink);}
+  const done=()=>{document.body.classList.remove('slide');
+    APPS.forEach((b,j)=>{const w=WIN[b.id];if(!w)return;if(j===idx){w.el.style.zIndex=30;w.el.classList.add('on');}else{w.el.classList.remove('on');w.el.style.zIndex=11;}});
+    place();layoutSwipe();if(n!==from){try{WIN[APPS[idx].id].f.focus();}catch(e){}APPS.forEach(a=>wantGlance(a.id,400));}};
+  if(RM.matches)done();else setTimeout(done,340);
+}
+SHELL.switchBy=dir=>{if(mode!=='app'||sw||!APPS[idx+dir])return;swStart();swFinish(idx+dir);};
+/* the zone over the tab bar: the first 8px of travel decide. Sideways: switch apps. Up or down: the stroke goes to the
+   app. No travel: a tap, delivered to the tab under the finger; on a hint chevron it switches apps instead. */
 (function(){
-  const G=$('#grab');let st=null;
+  const Z=$('#swz');let st=null;
   const fwd=(phase,e,axis)=>{const W=WIN[APPS[idx]&&APPS[idx].id];if(!W)return;const r=W.f.getBoundingClientRect();
     post(W,{type:'shell-ptr',phase,axis,x:e.clientX-r.left,y:e.clientY-r.top});};
-  G.addEventListener('pointerdown',e=>{if(mode!=='app'||(e.pointerType==='mouse'&&e.button!==0))return;
-    st={x:e.clientX,y:e.clientY,kind:null,on:false};try{G.setPointerCapture(e.pointerId);}catch(_){}});
-  G.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y;
+  Z.addEventListener('pointerdown',e=>{if(mode!=='app'||(e.pointerType==='mouse'&&e.button!==0))return;
+    st={x:e.clientX,y:e.clientY,kind:null};try{Z.setPointerCapture(e.pointerId);}catch(_){}});
+  Z.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y;
     if(!st.kind){
-      if(dy>8&&dy>Math.abs(dx)){st.kind='drag';G.classList.add('held');document.body.classList.add('held');st.on=shrinkStart();}
-      else if(Math.abs(dx)>8||dy<-8){st.kind='pass';st.axis=Math.abs(dx)>=Math.abs(dy)?'x':'y';fwd('down',{clientX:st.x,clientY:st.y},st.axis);}
+      if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){if(swStart()){st.kind='swipe';st.x0=st.x+Math.sign(dx)*8;document.body.classList.add('held');}}
+      else if(Math.abs(dy)>8){st.kind='pass';fwd('down',{clientX:st.x,clientY:st.y},'y');}
     }
-    if(st.kind==='drag'&&st.on)shrinkTo((dy-8)/(innerHeight*.34));
-    else if(st.kind==='pass')fwd('move',e,st.axis);});
-  const up=e=>{if(!st)return;const s=st;st=null;G.classList.remove('held');document.body.classList.remove('held');
-    if(s.kind==='drag'){if(s.on)shrinkEnd();}
-    else if(s.kind==='pass')fwd(e.type==='pointercancel'?'cancel':'up',e,s.axis);
-    else if(e.type==='pointerup')fwd('tap',e);};
-  G.addEventListener('pointerup',up);G.addEventListener('pointercancel',up);
-  /* keyboard has no drag: Enter or Space on the focused band goes back to the stack */
-  G.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&mode==='app'){e.preventDefault();toStack();}});
+    if(st.kind==='swipe')swMove(e.clientX-st.x0);
+    else if(st.kind==='pass')fwd('move',e,'y');});
+  const up=e=>{if(!st)return;const s=st;st=null;document.body.classList.remove('held');
+    if(s.kind==='swipe')swEnd();
+    else if(s.kind==='pass')fwd(e.type==='pointercancel'?'cancel':'up',e,'y');
+    else if(e.type==='pointerup'){
+      const W=innerWidth,edge=26;
+      if(e.clientX<edge&&APPS[idx-1])SHELL.switchBy(-1);
+      else if(e.clientX>W-edge&&APPS[idx+1])SHELL.switchBy(1);
+      else fwd('tap',e);
+    }};
+  Z.addEventListener('pointerup',up);Z.addEventListener('pointercancel',up);
 })();
+$('#homekey').addEventListener('click',()=>{if(mode==='app')toStack();});
 /* trackpad pinch on a laptop arrives as ctrl+wheel; feed it to the same gesture */
 let wz=null;
 function wheelPinch(dy){
@@ -1322,7 +1399,7 @@ document.addEventListener('keydown',e=>{
   if(mode!=='stack'||$('#sheet').classList.contains('open')||$('#setup').classList.contains('on'))return;
   if(e.key==='ArrowRight'||e.key==='ArrowLeft'){idx=Math.max(0,Math.min(APPS.length-1,idx+(e.key==='ArrowRight'?1:-1)));document.body.classList.add('anim');place();$(`.lab[data-i="${idx}"]`).focus({preventScroll:true});}
 });
-function onGeometry(){applyPads();place();layoutGrab();Object.values(WIN).forEach(w=>pushInsets(w.app));}
+function onGeometry(){applyPads();if(!sw)place();layoutSwipe();Object.values(WIN).forEach(w=>pushInsets(w.app));}
 addEventListener('resize',onGeometry);addEventListener('orientationchange',()=>setTimeout(onGeometry,250));
 if(window.visualViewport)visualViewport.addEventListener('resize',onGeometry);
 applyPads();
@@ -1417,7 +1494,7 @@ async function boot(){
   NOTES=(await DB.get('kv','notes'))||null;
   LOGQ=(await DB.get('kv','logs'))||[];
   const ix=await DB.get('kv','index');if(ix)INDEX=ix;
-  renderLabels();layoutGrab();syncLine();
+  renderLabels();syncLine();
   if(!GK){showSetup(false);return;}
   start();
 }
@@ -1429,9 +1506,9 @@ function start(){
   renderLabels();
   if(oi>=0){mode='app';document.body.classList.remove('stack');place();document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);
     APPS.forEach((a,i)=>{if(i!==idx)WIN[a.id].el.classList.remove('on');});WIN[APPS[idx].id].el.style.zIndex=30;
-    /* screenshots only: &drag=0.4 freezes a grab-bar drag part-way */
-    const dp=parseFloat(P.get('drag'));if(dp>0){setTimeout(()=>{shrinkStart();gz.force=true;$('#grab').classList.add('held');shrinkTo(dp);},P.get('dragAt')?+P.get('dragAt'):2500);}}
-  layoutGrab();
+    /* screenshots only: &drag=0.4 freezes a pinch part-way */
+    const dp=parseFloat(P.get('drag'));if(dp>0){setTimeout(()=>{shrinkStart();gz.force=true;shrinkTo(dp);},P.get('dragAt')?+P.get('dragAt'):2500);}}
+  layoutSwipe();
   Promise.all(APPS.map(a=>loadApp(a))).then(()=>{revalidate();schedule();setTimeout(prefetchPg,8000);});
 }
 boot();
