@@ -58,7 +58,7 @@ a.b{background:#111;color:#fff;}
 <main>
   <h1>Screen check</h1>
   <table id="t"></table>
-  <div class="row"><a class="b" href="./">Back</a></div>
+  <div class="row"><a class="b" href="./" onclick="event.preventDefault();location.replace('./')">Back</a></div>
   <p class="note">Pink is every pixel this page can paint; the black rules are its top and bottom edges, and the striped bands are what iOS reports as safe areas. Take one screenshot in portrait (and one in landscape if you can).</p>
   <p class="note"><b>Found on iOS 27.0.1 (Oct 2026):</b> the page is 873 tall on a 932 screen and every fixed element stops at y=873, but the page's root background still fills the band below it (873&ndash;932) and the status strip. theme-color and apple-mobile-web-app-status-bar-style change nothing there, so the shell colours that band through the root background, and the apps' tab bars get a 6px bottom inset instead of 34.</p>
 </main>

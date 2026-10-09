@@ -3,7 +3,7 @@
   "apps": [
     {
       "id": "tt",
-      "name": "Study plan",
+      "name": "Timetable",
       "kind": "tt",
       "file": "system/study_timetable.html",
       "state": "system/timetable-state.json",

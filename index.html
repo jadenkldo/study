@@ -92,10 +92,13 @@ body.stack #cap,body.gz #cap{display:none;}
 html.sim .island{display:block;position:fixed;top:11px;left:50%;width:126px;height:37px;margin-left:-63px;background:#000;border-radius:20px;z-index:200;pointer-events:none;}
 html.sim .clock{display:block;position:fixed;top:17px;left:calc(50% - 170px);font:600 17px/1 var(--font-ui);color:var(--clock,var(--text));z-index:200;pointer-events:none;}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important;}}
+html.rm *,html.rm *::before,html.rm *::after{transition:none!important;animation:none!important;scroll-behavior:auto!important;}
 
-#hd{position:fixed;left:0;right:0;top:0;z-index:5;padding:calc(var(--sat) + 16px) calc(22px + var(--sar)) 0 calc(22px + var(--sal));display:flex;align-items:baseline;justify-content:space-between;gap:12px;}
-#hd h1{font-size:28px;white-space:nowrap;}
-#hd .wk{color:var(--text2);white-space:nowrap;}
+/* home is the phone's settings and switching place: no date here (the Timetable shows it), just the Settings gear */
+#hd{position:fixed;left:0;right:0;top:0;z-index:25;padding:var(--hdt,calc(var(--sat) + 8px)) calc(10px + var(--sar)) 0 calc(10px + var(--sal));display:flex;justify-content:flex-end;pointer-events:none;}
+#hd .ib{pointer-events:auto;color:var(--text2);}
+#hd .ib svg{width:24px;height:24px;}
+body:not(.stack) #hd{visibility:hidden;}
 /* cards: the live app windows themselves, scaled; never snapshots */
 .win{transform-origin:0 0;will-change:transform;}
 body.anim .win{transition:transform .46s var(--ease),border-radius .46s var(--ease),box-shadow .3s;}
@@ -103,6 +106,12 @@ body.stack .win{box-shadow:0 18px 50px rgba(40,36,30,.16),0 0 0 2px rgba(40,36,3
 :root[data-theme="dark"] body.stack .win{box-shadow:0 0 0 2px #2c2c2c;}
 body.stack .win iframe,body.held .win iframe{pointer-events:none;}  /* a held swipe keeps every move, even over an app frame */
 body.slide .win{transition:transform .32s var(--ease);}
+/* reorder on home: hold a card ~350ms, it lifts; drag it sideways; the others make room; it settles where dropped */
+body.lifting .win:not(.lift),body.lifting .lab:not(.lift){transition:transform .25s var(--ease);}
+.win.lift{box-shadow:0 26px 60px rgba(40,36,30,.24),0 0 0 2px rgba(40,36,30,.08)!important;transition:box-shadow .2s;}
+:root[data-theme="dark"] .win.lift{box-shadow:0 26px 60px rgba(0,0,0,.7),0 0 0 2px #3a3a3a!important;}
+body.settle .win{transition:transform .34s cubic-bezier(.2,1.3,.4,1),border-radius .34s var(--ease)!important;}
+body.settle .lab{transition:transform .34s cubic-bezier(.2,1.3,.4,1)!important;}
 #labels{position:fixed;inset:0;z-index:15;pointer-events:none;transition:opacity .2s;}
 body:not(.stack) #labels{opacity:0;transition:opacity .12s;}
 .lab{position:absolute;left:0;top:0;display:block;text-align:left;padding:0 2px;pointer-events:none;}
@@ -110,7 +119,7 @@ body:not(.stack) #labels{opacity:0;transition:opacity .12s;}
 .lab .g{display:block;font-size:14px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lab:focus-visible{outline:2px solid var(--text);outline-offset:4px;}
 body.anim .lab{transition:transform .46s var(--ease);}
-#deck{position:fixed;inset:0;z-index:20;display:none;touch-action:pan-y;}
+#deck{position:fixed;inset:0;z-index:20;display:none;touch-action:pan-y;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
 body.stack #deck{display:block;}
 /* the tab-bar swipe: a see-through zone laid exactly over the open app's own tab bar (its position comes from the app
    frame, through the bridge). A sideways stroke there switches apps: the open app slides out and its neighbour in
@@ -119,9 +128,9 @@ body.stack #deck{display:block;}
 body:not(.stack) #swz.on{display:block;}
 /* the hint: a quiet chevron in the tab bar's outer edge, on the side where another app is; a tap on it switches too.
    It sits on the empty margin of the outermost tab, so the tabs themselves never move */
-#swz .hint{position:absolute;width:12px;height:12px;color:var(--hint,#6a635b);opacity:.55;pointer-events:none;transition:opacity .15s;}
-#swz .hint svg{width:12px;height:12px;stroke-width:2;display:block;}
-#swz .hint.l{left:calc(5px + var(--sal));} #swz .hint.r{right:calc(5px + var(--sar));}
+#swz .hint{position:absolute;width:7px;height:18px;color:var(--hint,#6a635b);opacity:.55;pointer-events:none;transition:opacity .15s;}
+#swz .hint svg{width:7px;height:18px;stroke-width:1.75;display:block;overflow:visible;}
+#swz .hint.l{left:calc(7px + var(--sal));} #swz .hint.r{right:calc(7px + var(--sar));}
 #swz .hint[hidden]{display:none;}
 body.swiping #swz .hint{opacity:0;}
 /* keyboard has no pinch or swipe: Tab reaches this, Enter takes the app home */
@@ -129,8 +138,15 @@ body.swiping #swz .hint{opacity:0;}
   background:var(--surface);border:1px solid var(--border2);font-weight:600;transform:translateY(-300%);opacity:0;}
 #homekey:focus-visible{transform:none;opacity:1;}
 body.stack #homekey{display:none;}
-@media (orientation:landscape) and (max-height:520px){#hd{padding-top:12px;}}
-@media (max-width:380px){#hd h1{font-size:24px;}.lab .nm{font-size:19px;}.lab .g{font-size:13.5px;}}
+/* sync line: the one quiet word on how the phone stands with the vault; tap it for the connection sheet */
+#status{position:fixed;left:50%;bottom:calc(var(--pb,var(--sab)) + 2px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
+  font-size:13px;color:var(--text3);white-space:nowrap;border-radius:99px;transition:opacity .2s;}
+#status i{width:7px;height:7px;border-radius:50%;background:var(--rule3);flex:none;}
+#status.warn{color:var(--duesoon);} #status.warn i{background:#f0a81c;}
+#status.bad{color:var(--overdue);} #status.bad i{background:var(--overdue);}
+#status:active{background:var(--surface-dim);}
+body:not(.stack) #status{opacity:0;pointer-events:none;}
+@media (max-width:380px){.lab .nm{font-size:19px;}.lab .g{font-size:13.5px;}}
 
 /* ══ the reading sheet: notes, PDFs and the connection panel, read-only, on the shell's own paper ══ */
 #sheet{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);visibility:hidden;
@@ -189,6 +205,26 @@ body.stack #homekey{display:none;}
 .rowinfo div{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--border);font-size:14.5px;}
 .rowinfo div span:last-child{color:var(--text2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
+/* ══ Settings ══ */
+.set{max-width:440px;margin:0 auto;}
+.set h3{font-size:18px;margin:30px 0 10px;}
+.set>h3:first-child{margin-top:4px;}
+.set .lbl{font-size:13.5px;font-weight:600;color:var(--text2);margin:16px 0 7px;}
+.set .acts{max-width:none;}
+.set .note{font-size:13.5px;color:var(--text3);margin-top:8px;}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:3px;padding:3px;border-radius:10px;background:var(--surface-dim);border:1px solid var(--border);}
+.seg button{min-height:44px;border-radius:8px;color:var(--text2);font-weight:500;font-size:14.5px;text-align:center;padding:0 6px;}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--text);font-weight:600;box-shadow:0 1px 2px rgba(40,36,30,.1),0 0 0 1px var(--border);}
+:root[data-theme="dark"] .seg button[aria-pressed="true"]{box-shadow:0 0 0 1px var(--border2);}
+.reorder{list-style:none;border-top:1px solid var(--border);}
+.reorder li{display:flex;align-items:center;gap:12px;min-height:56px;border-bottom:1px solid var(--border);background:var(--bg);position:relative;touch-action:pan-y;}
+.reorder li .sw{width:28px;height:28px;border-radius:8px;flex:none;background:var(--tp);box-shadow:inset 0 0 0 1px var(--tl);}
+.reorder li .nm{flex:1;font-weight:500;}
+.reorder li .ib{touch-action:none;cursor:grab;}
+.reorder li.lift{z-index:2;box-shadow:0 12px 28px rgba(40,36,30,.18);border-radius:10px;}
+:root[data-theme="dark"] .reorder li.lift{box-shadow:0 12px 28px rgba(0,0,0,.6);}
+.reorder.dragging li:not(.lift){transition:transform .2s var(--ease);}
+
 /* ══ buttons & fields (setup, sheets) ══ */
 .btn{min-height:48px;border-radius:10px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:0 18px;text-decoration:none;font-size:15.5px;}
 .btn.mark{background:var(--mark);color:var(--on-mark);}
@@ -228,12 +264,12 @@ body.stack #homekey{display:none;}
 <body class="stack">
 <div id="sa" aria-hidden="true"></div>
 <div class="island" aria-hidden="true"></div><div class="clock num" aria-hidden="true">7:09</div>
-<header id="hd"><h1 id="date">Today</h1><span class="wk num" id="wk"></span></header>
+<header id="hd"><button class="ib" id="gear" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button></header>
 <div id="wins"></div>
 <div id="cap" aria-hidden="true"></div>
 <div id="labels" role="list" aria-label="Apps"></div>
 <div id="deck" aria-hidden="true"></div>
-<div id="swz" aria-hidden="true"><span class="hint l" hidden><svg viewBox="0 0 12 12"><path d="M7.5 2.5L4 6l3.5 3.5"/></svg></span><span class="hint r" hidden><svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6 4.5 9.5"/></svg></span></div>
+<div id="swz" aria-hidden="true"><span class="hint l" hidden><svg viewBox="0 0 7 18"><path d="M6 1.5L1 9l5 7.5"/></svg></span><span class="hint r" hidden><svg viewBox="0 0 7 18"><path d="M1 1.5L6 9l-5 7.5"/></svg></span></div>
 <button id="homekey" type="button">Back to all apps</button>
 <button id="status" type="button" aria-live="polite"><i aria-hidden="true"></i><span>Starting</span></button>
 
@@ -273,7 +309,16 @@ body.stack #homekey{display:none;}
 const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
-const isDark=()=>TP==='dark'||(TP!=='light'&&MQ.matches);
+/* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
+const SHELL_VERSION='v8',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
+const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
+const LAST=readLS(LAST_KEY,{app:null,pages:{}});
+const savePref=()=>{try{localStorage.setItem(PREF_KEY,JSON.stringify(PREF));}catch(e){}};
+const saveLast=()=>{try{localStorage.setItem(LAST_KEY,JSON.stringify(LAST));}catch(e){}};
+const isDark=()=>TP==='dark'||(TP!=='light'&&(PREF.theme==='dark'||(PREF.theme!=='light'&&MQ.matches)));
+const reduced=()=>PREF.motion==='on'||RM.matches;
+function applyMotion(){document.documentElement.classList.toggle('rm',reduced());}
 const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const MS_DAY=864e5,pad=n=>String(n).padStart(2,'0');
@@ -315,7 +360,7 @@ function canvasFor(a){
   if(a){r.setProperty('--canvas',look(a).bar||look(a).paper);r.setProperty('--capc',look(a).top||look(a).paper);}
   else{r.removeProperty('--canvas');r.removeProperty('--capc');}
 }
-applyTheme();
+applyTheme();applyMotion();
 
 /* ---------- safe areas: the shell measures them once and hands each app the numbers (env() reads 0 inside a frame) ---------- */
 /* the visible page, as laid out: the open app is exactly this size, and gets exactly the insets iOS reports (even 0) */
@@ -341,7 +386,8 @@ const TAB_PAD=6;
 const BLUR_CLEAR=20;
 const capH=()=>osStrips()?insets().t+BLUR_CLEAR:0;
 const appInsets=()=>{const i=insets(),st=osStrips();return{t:st?i.t+BLUR_CLEAR:i.t,b:st?TAB_PAD:i.b,l:i.l,r:i.r};};
-function applyPads(){const r=document.documentElement.style;r.setProperty('--pb',(osStrips()?TAB_PAD:insets().b)+'px');r.setProperty('--capH',capH()+'px');}
+function applyPads(){const r=document.documentElement.style,st=osStrips();r.setProperty('--pb',(st?TAB_PAD:insets().b)+'px');r.setProperty('--capH',capH()+'px');
+  r.setProperty('--hdt',(st?insets().t+BLUR_CLEAR:insets().t+8)+'px');}
 
 /* ══ storage: IndexedDB holds every file fetched from the vault (keyed by path, stamped with Drive's modified time),
    the last state each app saved while offline, the glances and the note list ══ */
@@ -356,6 +402,7 @@ const DB={
   put(store,k,v){return DB.tx(store,'readwrite',s=>s.put(v,k)).catch(e=>console.warn('shell: could not cache',k,e));},
   del(store,k){return DB.tx(store,'readwrite',s=>s.delete(k)).catch(()=>{});},
   clear(store){return DB.tx(store,'readwrite',s=>s.clear()).catch(()=>{});},
+  keys(store){return DB.tx(store,'readonly',s=>s.getAllKeys()).catch(()=>[]).then(k=>k||[]);},
 };
 
 /* ══ the gatekeeper: JSON over a text/plain POST (no CORS preflight), every call carries the key ══ */
@@ -463,6 +510,14 @@ async function getText(path){const e=await getFile(path);if(e.text==null)throw n
 /* ══ the apps registry (apps.json): a future app is one entry ══ */
 let APPS=[];
 const look=a=>a.look[isDark()?'dark':'light'];
+/* the phone's own app order (Settings, or hold-and-drag on home); apps.json order otherwise; new apps go last */
+function orderApps(list){if(!Array.isArray(PREF.order))return list.slice();
+  const pos=id=>{const i=PREF.order.indexOf(id);return i<0?1e3+list.findIndex(a=>a.id===id):i;};
+  return list.slice().sort((a,b)=>pos(a.id)-pos(b.id));}
+function setOrder(ids,keep){
+  const cur=keep||APPS[idx];PREF.order=ids.slice();savePref();APPS=orderApps(APPS);idx=Math.max(0,APPS.indexOf(cur));
+  renderLabels();layoutSwipe();if(settingsOpen())renderReorder();
+}
 const ssDir=a=>a.file.split('/').slice(0,-1).join('/');
 /* every vault file an app needs to start, worked out the way its plugin does */
 async function codePaths(a,{fetchMissing=true}={}){
@@ -502,8 +557,15 @@ function shellBridge(KIND,INS){
     ?'body.phone{--ph-sat:'+px(i.t)+';--ph-sab:'+px(i.b)+';--ph-sal:'+px(i.l)+';--ph-sar:'+px(i.r)+'}'
     :'html.phone{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}')+TABS;setTimeout(tbReport,60);}
   /* where the tab bar is (or that it's hidden, as on Study Space's question screen), so the shell can lay its swipe zone over it */
-  var TSEL=KIND==='tt'?'.ph-tabs':'#phTabs',tbLast='',tbQ=0;
-  function tbReport(){tbQ=0;var el=document.querySelector(TSEL),m=null;
+  var TSEL=KIND==='tt'?'.ph-tabs':'#phTabs',tbLast='',tbQ=0,pgLast=null;
+  /* the page he is on (the timetable's phone tab; Study Space's tab), so the phone reopens there next time */
+  function curPage(){try{if(KIND==='tt')return(typeof PH!=='undefined'&&PH.on&&PH.tab)||null;
+    var t=document.querySelector('#phTabs .tab[aria-current="page"]');return t?t.dataset.v:null;}catch(e){return null;}}
+  function goPage(pg,tries){var b=document.querySelector(KIND==='tt'?'.ph-tab[data-ph-tab="'+pg+'"]':'#phTabs .tab[data-v="'+pg+'"]');
+    if(b&&b.getClientRects().length){if(curPage()!==pg)b.click();return;}
+    if((tries||0)<30)setTimeout(function(){goPage(pg,(tries||0)+1);},150);}
+  function tbReport(){tbQ=0;var pg=curPage();if(pg&&pg!==pgLast){pgLast=pg;post({type:'shell-page',page:pg});}
+    var el=document.querySelector(TSEL),m=null;
     if(el){var r=el.getBoundingClientRect(),cs=getComputedStyle(el);
       if(r.height>0&&r.bottom>0&&cs.display!=='none'&&cs.visibility!=='hidden'){var ic=el.querySelector('svg'),ir=ic&&ic.getBoundingClientRect();
         m={top:r.top,bottom:r.bottom,iconY:ir?ir.top+ir.height/2:r.top+r.height/2};}}
@@ -573,6 +635,7 @@ function shellBridge(KIND,INS){
     if(e.source!==parent)return;var d=e.data;if(!d||typeof d!=='object')return;
     if(d.type==='shell-insets')insets(d);
     else if(d.type==='shell-ptr')ptr(d);
+    else if(d.type==='shell-goto'&&typeof d.page==='string')goPage(d.page,0);
     else if(d.type==='shell-glance?'){var g=null;try{g=KIND==='tt'?ttGlance():ssGlance();}catch(err){g={error:String(err&&err.message||err)};}post({type:'shell-glance',model:g});}
   });
   var d0=1,on=false;
@@ -719,6 +782,14 @@ function clock(d){let h=d.getHours();const m=d.getMinutes(),ap=h>=12?'PM':'AM';h
 const WIN={};
 let NOTES=null,INDEX=null;
 function post(W,msg,transfer){try{W.f.contentWindow.postMessage(msg,'*',transfer||[]);}catch(e){}}
+/* reopening: each app goes back to the page he left it on (Settings → Open to → Last page); nothing is saved
+   until that has happened, so the app's own start page can't overwrite the memory first */
+function restorePage(W){
+  const pg=LAST.pages[W.app.id];
+  if(PREF.openTo==='last'&&pg){W.restored=false;setTimeout(()=>{post(W,{type:'shell-goto',page:pg});setTimeout(()=>{W.restored=true;},1500);},250);}
+  else W.restored=true;
+}
+function setLast(a){if(a&&LAST.app!==a.id){LAST.app=a.id;saveLast();}}
 function themeMsgs(a){return a.kind==='tt'?[{type:'tt-theme',theme:isDark()?'dark':'light'}]:a.kind==='ss'?[{type:'ss-theme',dark:isDark(),accent:null}]:[];}
 addEventListener('message',e=>{
   const W=Object.values(WIN).find(w=>w.f.contentWindow===e.source);if(!W)return;
@@ -728,16 +799,17 @@ addEventListener('message',e=>{
   if(d.type==='shell-wheel'){if(mode==='app'&&APPS[idx]===a)wheelPinch(+d.dy||0);return;}
   if(d.type==='shell-glance'){gotGlance(a,d.model);return;}
   if(d.type==='shell-tabbar'){W.tabbar=d.rect||null;if(mode==='app'&&APPS[idx]===a&&!sw)layoutSwipe();return;}
+  if(d.type==='shell-page'){if(typeof d.page==='string'&&W.restored!==false){LAST.pages[a.id]=d.page;saveLast();}return;}
   if(a.kind==='tt')ttMsg(W,a,d);else if(a.kind==='ss')ssMsg(W,a,d);
 });
 function ttMsg(W,a,d){
-  if(d.type==='tt-ready'){W.ready=true;post(W,{type:'tt-init',state:stateOf(a.id)});themeMsgs(a).forEach(m=>post(W,m));if(NOTES)post(W,{type:'tt-notes',notes:NOTES});wantGlance(a.id,1200);}
+  if(d.type==='tt-ready'){W.ready=true;restorePage(W);post(W,{type:'tt-init',state:stateOf(a.id)});themeMsgs(a).forEach(m=>post(W,m));if(NOTES)post(W,{type:'tt-notes',notes:NOTES});wantGlance(a.id,1200);}
   else if(d.type==='tt-save')onAppSave(a,d.state);
   else if(d.type==='tt-open-note')openLectureNote(d.unit,d.week);
   /* tt-summary feeds the desktop's course-page to-do and notifications: nothing to do on the phone */
 }
 function ssMsg(W,a,d){
-  if(d.type==='ss-ready'){W.ready=true;post(W,{type:'ss-init',state:stateOf(a.id)});themeMsgs(a).forEach(m=>post(W,m));sendDue(a);wantGlance(a.id,1200);}
+  if(d.type==='ss-ready'){W.ready=true;restorePage(W);post(W,{type:'ss-init',state:stateOf(a.id)});themeMsgs(a).forEach(m=>post(W,m));sendDue(a);wantGlance(a.id,1200);}
   else if(d.type==='ss-save')onAppSave(a,d.state);
   else if(d.type==='ss-open'&&typeof d.path==='string')openPath(d.path);
   else if(d.type==='ss-want-logs'&&Array.isArray(d.files)){W.logFiles=d.files.filter(f=>typeof f==='string'&&f.endsWith('.md'));sendLogs(a);}
@@ -968,7 +1040,7 @@ function sheetOpen(title,sub){
   $('#sh-t').innerHTML=esc(title)+(sub?`<small>${esc(sub)}</small>`:'');
   if(!s.classList.contains('open')){lastFocus=document.activeElement;s.classList.add('open');s.setAttribute('aria-hidden','false');$('#swz').style.visibility='hidden';}
   $('#sh-back').hidden=SH.hist.length<2;
-  setTimeout(()=>$('#sh-b').focus({preventScroll:true}),RM.matches?0:60);
+  setTimeout(()=>$('#sh-b').focus({preventScroll:true}),reduced()?0:60);
 }
 function sheetClose(){
   const s=$('#sheet');if(!s.classList.contains('open'))return;
@@ -984,7 +1056,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#sheet').classLi
 (function(){
   const hd=$('#sheet>header'),s=$('#sheet');let st=null;
   hd.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;st={y:e.clientY,dy:0};hd.setPointerCapture(e.pointerId);s.style.transition='none';});
-  hd.addEventListener('pointermove',e=>{if(!st)return;st.dy=Math.max(0,e.clientY-st.y);if(!RM.matches)s.style.transform=`translateY(${st.dy}px)`;});
+  hd.addEventListener('pointermove',e=>{if(!st)return;st.dy=Math.max(0,e.clientY-st.y);if(!reduced())s.style.transform=`translateY(${st.dy}px)`;});
   const up=()=>{if(!st)return;const dy=st.dy;st=null;s.style.transition='';s.style.transform='';if(dy>innerHeight*.18)sheetClose();};
   hd.addEventListener('pointerup',up);hd.addEventListener('pointercancel',up);
 })();
@@ -1098,11 +1170,7 @@ function line(a){
   if(a.glance==='ss')return(m.subs||[]).slice(0,2).map(s=>`<span class="g num"><i class="dot" style="--c:${esc(colOf(s)||'currentColor')}"></i> ${esc(s.title)} <span class="${s.due?'':'mut'}">${s.due?s.due+' to drill':'none due'}</span></span>`).join('');
   return'';
 }
-function renderHead(){
-  const now=new Date();$('#date').textContent=`${DAYL[(now.getDay()+6)%7]} ${now.getDate()} ${MONL[now.getMonth()]}`;
-  const t=APPS.find(a=>a.glance==='tt'),m=t&&GL[t.id];
-  $('#wk').textContent=m&&m.today===isoOf(now)?(m.week?`Week ${m.week} / ${m.weeks}`:(m.tag||'')):'';
-}
+function renderHead(){}   /* home no longer shows the date; kept so callers stay simple */
 
 /* ══ live app windows ══ */
 function ensureWin(a){
@@ -1208,6 +1276,9 @@ addEventListener('offline',syncLine);
 
 /* ══ home: the card stack (ported from the approved home-final mock) ══ */
 const SHELL={};
+/* focus moves for the keyboard only: after a touch, a focus ring on a card label is just noise */
+let kbdUsed=false;
+addEventListener('keydown',()=>{kbdUsed=true;},true);addEventListener('pointerdown',()=>{kbdUsed=false;},true);
 let mode='stack',idx=0;
 const LAB_H=96,STATUS_H=46;
 function geo(){
@@ -1241,7 +1312,7 @@ function layoutSwipe(){
   /* an open app's frame fills the page from 0,0 at scale 1, so its tab bar's frame coordinates are page coordinates */
   Z.style.top=tb.top+'px';Z.style.height=(tb.bottom-tb.top)+'px';Z.classList.add('on');
   Z.style.setProperty('--hint',look(a).muted);
-  const cy=tb.iconY-tb.top-6;
+  const cy=tb.iconY-tb.top-9;
   $('#swz .hint.l').style.top=cy+'px';$('#swz .hint.r').style.top=cy+'px';
   $('#swz .hint.l').hidden=!APPS[idx-1];$('#swz .hint.r').hidden=!APPS[idx+1];
 }
@@ -1249,10 +1320,10 @@ SHELL.repaint=()=>{renderLabels();layoutSwipe();if(mode==='app'){document.docume
 
 /* ── the one authored transition: the card grows into the app, and the app shrinks back into its card ── */
 let settleT=0;
-function settle(fn){clearTimeout(settleT);settleT=setTimeout(fn,RM.matches?0:480);}
+function settle(fn){clearTimeout(settleT);settleT=setTimeout(fn,reduced()?0:480);}
 function openApp(i){
   if(i<0||i>=APPS.length)return;
-  idx=i;const a=APPS[i],W=ensureWin(a);W.el.classList.add('on');
+  idx=i;const a=APPS[i],W=ensureWin(a);W.el.classList.add('on');setLast(a);
   document.body.classList.add('anim');document.body.classList.remove('stack');mode='app';
   W.el.style.zIndex=30;APPS.forEach((b,j)=>{const w=WIN[b.id];if(w&&j!==i)w.el.style.zIndex=11;});
   place();document.documentElement.style.setProperty('--clock',look(a).ink);layoutSwipe();
@@ -1266,7 +1337,7 @@ function toStack(){
   renderLabels();APPS.forEach(a=>wantGlance(a.id,500));
   settle(()=>{if(mode==='stack')document.body.classList.remove('anim');
     APPS.forEach(a=>{const w=WIN[a.id];if(w&&w.stale)loadApp(a);});
-    const b=$(`.lab[data-i="${idx}"]`);if(b)b.focus({preventScroll:true});});
+    const b=$(`.lab[data-i="${idx}"]`);if(b&&kbdUsed)b.focus({preventScroll:true});});
 }
 
 /* ── the shrink gesture (a pinch inside the app, or ctrl+wheel on a laptop): one scale/position mapping, one set of release rules ──
@@ -1283,7 +1354,7 @@ function shrinkStart(){
 function shrinkTo(p){
   if(!gz)return;p=Math.max(0,Math.min(1,p));
   const t=performance.now(),dt=t-gz.lt;if(dt>0)gz.v=.6*gz.v+.4*((p-gz.p)/dt);gz.p=p;gz.lt=t;
-  if(RM.matches&&!gz.force)return;
+  if(reduced()&&!gz.force)return;
   const g=geo(),W=WIN[APPS[idx].id],s=1-p*(1-g.s),x=p*cardX(idx,g),y=p*g.top;
   W.el.style.transform=`translate(${x}px,${y}px) scale(${s})`;W.el.style.borderRadius=(p*22/s)+'px';
 
@@ -1308,8 +1379,9 @@ SHELL.pinch=(phase,r)=>{
 let sw=null;
 const SW_COMMIT=.3,SW_FLICK=.45;   /* fraction of the width; px per ms */
 function swStart(){
+  if(sw&&performance.now()-sw.lt>2000)sw=null;          /* never let a lost stroke block the next one */
   if(mode!=='app'||sw||gz)return false;
-  sw={dx:0,v:0,lt:performance.now()};document.body.classList.remove('anim','slide');document.body.classList.add('swiping');
+  sw={dx:0,v:0,lt:performance.now(),hist:[]};document.body.classList.remove('anim','slide');document.body.classList.add('swiping');
   [idx-1,idx+1].forEach(j=>{const b=APPS[j];if(!b)return;const w=ensureWin(b);w.el.classList.add('on');w.el.style.zIndex=30;w.el.style.borderRadius='0px';
     w.el.style.transform=`translate(${(j-idx)*innerWidth}px,0px) scale(1)`;});
   return true;
@@ -1321,8 +1393,11 @@ function swPaint(dx){
 function swMove(raw){
   if(!sw)return;const t=performance.now(),dt=t-sw.lt,n=raw<0?idx+1:idx-1;
   const dx=APPS[n]?raw:raw*.3;                         /* rubber band at the ends */
-  if(dt>0)sw.v=.6*sw.v+.4*((dx-sw.dx)/dt);sw.dx=dx;sw.lt=t;
-  if(!RM.matches)swPaint(dx);
+  /* speed over the last 100ms, never from two samples closer than 16ms: touch moves arrive bunched, and a 1ms gap
+     between two of them read as a flick */
+  sw.hist.push([t,dx]);while(sw.hist.length>2&&t-sw.hist[0][0]>100)sw.hist.shift();
+  const h0=sw.hist[0],span=t-h0[0];sw.v=span>=16?(dx-h0[1])/span:0;sw.dx=dx;sw.lt=t;
+  if(!reduced())swPaint(dx);
 }
 function swEnd(){
   if(!sw)return;const{dx}=sw,v=performance.now()-sw.lt>90?0:sw.v,W=innerWidth;sw=null;
@@ -1331,15 +1406,16 @@ function swEnd(){
   swFinish(go?n:idx);
 }
 function swFinish(n){
-  const from=idx,W=innerWidth;
-  document.body.classList.remove('swiping');
-  if(!RM.matches)document.body.classList.add('slide');
+  const from=idx;sw=null;
+  document.body.classList.remove('swiping','held');
+  if(!reduced())document.body.classList.add('slide');
   idx=n;swPaint(0);                                    /* slide every window to its place around the new idx */
   if(n!==from){canvasFor(APPS[n]);document.documentElement.style.setProperty('--clock',look(APPS[n]).ink);}
+  clearTimeout(swFinish.t);
   const done=()=>{document.body.classList.remove('slide');
     APPS.forEach((b,j)=>{const w=WIN[b.id];if(!w)return;if(j===idx){w.el.style.zIndex=30;w.el.classList.add('on');}else{w.el.classList.remove('on');w.el.style.zIndex=11;}});
-    place();layoutSwipe();if(n!==from){try{WIN[APPS[idx].id].f.focus();}catch(e){}APPS.forEach(a=>wantGlance(a.id,400));}};
-  if(RM.matches)done();else setTimeout(done,340);
+    place();layoutSwipe();if(n!==from){setLast(APPS[idx]);try{WIN[APPS[idx].id].f.focus();}catch(e){}APPS.forEach(a=>wantGlance(a.id,400));}};
+  if(reduced())done();else swFinish.t=setTimeout(done,340);
 }
 SHELL.switchBy=dir=>{if(mode!=='app'||sw||!APPS[idx+dir])return;swStart();swFinish(idx+dir);};
 /* the zone over the tab bar: the first 8px of travel decide. Sideways: switch apps. Up or down: the stroke goes to the
@@ -1380,20 +1456,48 @@ function wheelPinch(dy){
 addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();if(mode==='app')wheelPinch(e.deltaY);}},{passive:false});
 ['gesturestart','gesturechange'].forEach(t=>document.addEventListener(t,e=>e.preventDefault()));
 
-/* ── the deck: swipe sideways through the cards, tap one to step in ── */
+/* ── the deck: swipe sideways through the cards, tap one to step in, hold one to lift it and drag it to a new place ── */
+function cardAt(x,y){const g=geo();for(let i=0;i<APPS.length;i++){const cx=cardX(i,g);if(x>=cx&&x<=cx+g.cw&&y>=g.top&&y<=g.top+g.ch+LAB_H)return i;}return-1;}
+/* while a card is lifted: order[] is the would-be order (indices into APPS), the lifted card follows the finger */
+function placeOrder(order,lifted,dx){
+  const g=geo(),k=1.04;
+  order.forEach((j,pos)=>{const a=APPS[j],W=WIN[a.id],L=$(`.lab[data-i="${j}"]`);
+    let x=g.x0+(pos-idx)*(g.cw+g.gap),y=g.top,sc=g.s,lx=x;
+    if(j===lifted){lx=cardX(j,g)+dx;x=lx-g.cw*(k-1)/2;y=g.top-g.ch*(k-1)/2-6;sc=g.s*k;}
+    if(W){W.el.style.transform=`translate(${x}px,${y}px) scale(${sc})`;W.el.style.borderRadius=(22/sc)+'px';}
+    if(L)L.style.transform=`translate(${lx}px,${g.top+g.ch+14}px)`;
+  });
+}
 (function(){
   const D=$('#deck');let st=null;
-  D.addEventListener('pointerdown',e=>{st={x:e.clientX,y:e.clientY,dx:0,h:false};D.setPointerCapture(e.pointerId);});
+  const lift=()=>{if(!st||st.h||st.moved||mode!=='stack')return;const i=cardAt(st.x,st.y);if(i<0)return;
+    st.lift={i,order:APPS.map((_,j)=>j)};document.body.classList.remove('anim');document.body.classList.add('lifting');
+    const W=WIN[APPS[i].id];if(W){W.el.classList.add('lift');W.el.style.zIndex=31;}const L=$(`.lab[data-i="${i}"]`);if(L)L.classList.add('lift');
+    placeOrder(st.lift.order,i,0);};
+  D.addEventListener('pointerdown',e=>{st={x:e.clientX,y:e.clientY,dx:0,h:false,moved:false};D.setPointerCapture(e.pointerId);
+    st.lp=setTimeout(lift,350);});
   D.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y;
+    if(st.lift){const g=geo(),n=APPS.length,i=st.lift.i;
+      const slot=Math.max(0,Math.min(n-1,Math.round((cardX(i,g)+dx-g.x0)/(g.cw+g.gap))+idx));
+      const order=APPS.map((_,j)=>j).filter(j=>j!==i);order.splice(slot,0,i);st.lift.order=order;placeOrder(order,i,dx);return;}
+    if(Math.abs(dx)>8||Math.abs(dy)>8){st.moved=true;clearTimeout(st.lp);}
     if(!st.h&&Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){st.h=true;document.body.classList.remove('anim');}
     if(st.h){const edge=(idx===0&&dx>0)||(idx===APPS.length-1&&dx<0);st.dx=edge?dx*.3:dx;place(st.dx);}});
-  const up=e=>{if(!st)return;const s=st;st=null;const g=geo();
+  const up=e=>{if(!st)return;const s=st;st=null;clearTimeout(s.lp);const g=geo();
+    if(s.lift){const {i,order}=s.lift,a=APPS[i];
+      document.body.classList.remove('lifting');$$('.win.lift,.lab.lift').forEach(x=>x.classList.remove('lift'));
+      const W=WIN[a.id];if(W)W.el.style.zIndex=11;
+      if(!reduced())document.body.classList.add('settle');
+      setOrder(order.map(j=>APPS[j].id),a);place();
+      setTimeout(()=>document.body.classList.remove('settle'),reduced()?0:380);return;}
     if(s.h){let n=idx;if(Math.abs(s.dx)>40)n=idx-Math.sign(s.dx)*Math.max(1,Math.round(Math.abs(s.dx)/(g.cw+g.gap)));
       idx=Math.max(0,Math.min(APPS.length-1,n));document.body.classList.add('anim');place();settle(()=>mode==='stack'&&document.body.classList.remove('anim'));return;}
-    if(e.type!=='pointerup')return;
-    for(let i=0;i<APPS.length;i++){const x=cardX(i,g);if(e.clientX>=x&&e.clientX<=x+g.cw&&e.clientY>=g.top&&e.clientY<=g.top+g.ch+LAB_H){openApp(i);return;}}
+    if(e.type!=='pointerup'||s.moved)return;
+    const i=cardAt(e.clientX,e.clientY);if(i>=0)openApp(i);
   };
   D.addEventListener('pointerup',up);D.addEventListener('pointercancel',up);
+  /* a held finger is a lift here, never the system's long-press menu */
+  D.addEventListener('contextmenu',e=>e.preventDefault());
 })();
 document.addEventListener('keydown',e=>{
   if(mode!=='stack'||$('#sheet').classList.contains('open')||$('#setup').classList.contains('on'))return;
@@ -1403,8 +1507,9 @@ function onGeometry(){applyPads();if(!sw)place();layoutSwipe();Object.values(WIN
 addEventListener('resize',onGeometry);addEventListener('orientationchange',()=>setTimeout(onGeometry,250));
 if(window.visualViewport)visualViewport.addEventListener('resize',onGeometry);
 applyPads();
-MQ.addEventListener('change',()=>{if(TP)return;applyTheme();
-  Object.values(WIN).forEach(W=>{paintWin(W);if(W.ready)themeMsgs(W.app).forEach(m=>post(W,m));});SHELL.repaint();});
+function refreshTheme(){applyTheme();Object.values(WIN).forEach(W=>{paintWin(W);if(W.ready)themeMsgs(W.app).forEach(m=>post(W,m));});SHELL.repaint();}
+MQ.addEventListener('change',()=>{if(TP||PREF.theme!=='auto')return;refreshTheme();});
+RM.addEventListener('change',applyMotion);
 setInterval(()=>{if(mode==='stack'&&document.visibilityState==='visible')renderLabels();},60e3);
 
 /* ══ setup & the connection sheet ══ */
@@ -1451,36 +1556,83 @@ function pgLine(){
   if(PG.state==='paused')return'download paused, it picks up again on its own';
   return'not downloaded yet';
 }
-function connBody(){
-  const n=pending(),host=GK?(()=>{try{return new URL(GK.url).host;}catch(e){return GK.url;}})():'not set';
-  const E=NET.lastErr,showErr=E&&(!lastSync||E.at>=lastSync-1000);
-  return `<p class="sheet-lead">${esc($('#status span').textContent)}.</p>
-  <div class="rowinfo"><div><span>Gatekeeper</span><span>${esc(host)}</span></div>
+const hostOf=()=>GK?(()=>{try{return new URL(GK.url).host;}catch(e){return GK.url;}})():'not set';
+function statusRows(){
+  const n=pending(),E=NET.lastErr,showErr=E&&(!lastSync||E.at>=lastSync-1000);
+  return `<div><span>Now</span><span>${esc($('#status span').textContent)}</span></div>
   <div><span>Last synced</span><span class="num">${lastSync?clock(new Date(lastSync)):'not yet'}</span></div>
   <div><span>Waiting to save</span><span class="num">${n?n+' change'+(n>1?'s':''):'nothing'}</span></div>
-  ${showErr?`<div><span>Last try ${esc(clock(new Date(E.at)))}</span><span>${esc(E.msg)}</span></div>`:''}
-  <div><span>SQL engine</span><span class="num" id="cx-pg">${esc(pgLine())}</span></div></div>`;
+  ${showErr?`<div><span>Last try ${esc(clock(new Date(E.at)))}</span><span>${esc(E.msg)}</span></div>`:''}`;
 }
-function sheetRefresh(){const el=$('#cx-info');if(el&&$('#sheet').classList.contains('open'))el.innerHTML=connBody();}
-$('#status').addEventListener('click',()=>{
-  SH.hist=[];sheetOpen('Connection');
-  sheetBody(`<div id="cx-info">${connBody()}</div>
-  <div class="acts"><button class="btn quiet" type="button" id="cx-sync">Sync now</button>
-  <button class="btn quiet" type="button" id="cx-edit">Change the URL or key</button>
-  <button class="btn quiet" type="button" id="cx-reload">Reload both apps</button>
-  <a class="btn quiet" id="cx-diag" href="diag.html">Screen check</a>
-  <button class="btn quiet danger" type="button" id="cx-forget">Forget this phone</button></div>`);
+const settingsOpen=()=>$('#sheet').classList.contains('open')&&!!$('#set');
+function sheetRefresh(){if(!settingsOpen())return;$('#set-status').innerHTML=statusRows();$('#set-pg').textContent=pgLine();
+  const b=$('#set-pgdl');if(b){b.hidden=PG.state==='ready';b.disabled=PG.state==='downloading';}}
+const seg=(name,val,opts)=>`<div class="seg" role="group" aria-label="${esc(name)}">${opts.map(([v,l])=>`<button type="button" data-set="${esc(name)}" data-v="${v}" aria-pressed="${v===val}">${esc(l)}</button>`).join('')}</div>`;
+function renderReorder(){
+  const ul=$('#set-order');if(!ul)return;
+  ul.innerHTML=APPS.map(a=>{const L=look(a);return`<li data-id="${esc(a.id)}"><span class="sw" style="--tp:${L.paper};--tl:${L.line}"></span><span class="nm">${esc(a.name)}</span>
+    <button class="ib" type="button" aria-label="Move ${esc(a.name)}: drag, or use the arrow keys"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9h14M5 15h14"/></svg></button></li>`;}).join('');
+  $$('#set-order .ib').forEach(h=>{
+    h.addEventListener('keydown',e=>{if(e.key!=='ArrowUp'&&e.key!=='ArrowDown')return;e.preventDefault();
+      const ids=APPS.map(a=>a.id),id=h.closest('li').dataset.id,i=ids.indexOf(id),j=i+(e.key==='ArrowUp'?-1:1);if(j<0||j>=ids.length)return;
+      ids.splice(i,1);ids.splice(j,0,id);setOrder(ids);$(`#set-order li[data-id="${id}"] .ib`).focus();});
+    h.addEventListener('pointerdown',e=>{
+      const li=h.closest('li'),ul=$('#set-order'),rows=[...ul.children],i=rows.indexOf(li),hgt=li.getBoundingClientRect().height,y0=e.clientY;
+      try{h.setPointerCapture(e.pointerId);}catch(_){}li.classList.add('lift');ul.classList.add('dragging');let j=i;
+      const mv=ev=>{const dy=ev.clientY-y0;li.style.transform=`translateY(${dy}px)`;j=Math.max(0,Math.min(rows.length-1,i+Math.round(dy/hgt)));
+        rows.forEach((r,k)=>{if(r===li)return;r.style.transform=(k>i&&k<=j)?`translateY(${-hgt}px)`:(k<i&&k>=j)?`translateY(${hgt}px)`:'';});};
+      const end=()=>{h.removeEventListener('pointermove',mv);h.removeEventListener('pointerup',end);h.removeEventListener('pointercancel',end);
+        ul.classList.remove('dragging');rows.forEach(r=>{r.style.transform='';r.classList.remove('lift');});
+        if(j!==i){const ids=rows.map(r=>r.dataset.id);ids.splice(i,1);ids.splice(j,0,li.dataset.id);setOrder(ids);}};
+      h.addEventListener('pointermove',mv);h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end);});
+  });
+}
+function openSettings(){
+  SH.hist=[];sheetOpen('Settings');
+  sheetBody(`<div class="set" id="set">
+  <h3>Status</h3><div class="rowinfo" id="set-status">${statusRows()}</div>
+  <h3>Sync</h3><div class="acts"><button class="btn quiet" type="button" id="cx-sync">Sync now</button>
+    <button class="btn quiet" type="button" id="cx-reload">Reload both apps</button>
+    <a class="btn quiet" id="cx-diag" href="diag.html">Screen check</a></div>
+  <h3>Start-up</h3><p class="lbl">Open to</p>${seg('openTo',PREF.openTo,[['last','Last page'],['tt','Timetable']])}
+    <p class="note">${PREF.openTo==='last'?'The app and page you were last on.':'The Timetable, on Today.'}</p>
+  <h3>Apps</h3><ol class="reorder" id="set-order" aria-label="App order"></ol>
+    <p class="note">The order of the cards on this screen and of swiping on the tab bar. You can also hold a card and drag it.</p>
+  <h3>Appearance</h3><p class="lbl">Theme</p>${seg('theme',PREF.theme,[['auto','Match iPhone'],['light','Light'],['dark','Dark']])}
+  <h3>Motion</h3><p class="lbl">Reduce motion</p>${seg('motion',PREF.motion,[['auto','Match iPhone'],['on','On']])}
+  <h3>Data</h3><div class="rowinfo"><div><span>SQL engine</span><span class="num" id="set-pg">${esc(pgLine())}</span></div></div>
+    <div class="acts"><button class="btn quiet" type="button" id="set-pgdl"${PG.state==='ready'?' hidden':''}>Download now</button>
+    <button class="btn quiet" type="button" id="set-clear">Clear saved copies</button></div>
+    <p class="note">Clearing removes the copies of the apps, notes and SQL engine kept on this phone. They download again; your key and unsaved changes stay.</p>
+  <h3>Connection</h3><div class="acts"><button class="btn quiet" type="button" id="cx-edit">Change the URL or key</button>
+    <button class="btn quiet danger" type="button" id="cx-forget">Forget this phone</button></div>
+  <h3>About</h3><div class="rowinfo"><div><span>Phone shell</span><span class="num">${SHELL_VERSION}</span></div><div><span>Gatekeeper</span><span>${esc(hostOf())}</span></div></div>
+  </div>`);
+  renderReorder();
+  $$('#set [data-set]').forEach(b=>b.addEventListener('click',()=>{
+    const k=b.dataset.set,v=b.dataset.v;PREF[k]=v;savePref();
+    $$(`#set [data-set="${k}"]`).forEach(x=>x.setAttribute('aria-pressed',String(x===b)));
+    if(k==='theme')refreshTheme();else if(k==='motion')applyMotion();
+    else if(k==='openTo')b.closest('.seg').nextElementSibling.textContent=v==='last'?'The app and page you were last on.':'The Timetable, on Today.';}));
   $('#cx-sync').addEventListener('click',async()=>{const b=$('#cx-sync');b.textContent='Syncing';b.disabled=true;
     NET.fails=0;revalidate.busy=false;await revalidate();b.textContent='Sync now';b.disabled=false;sheetRefresh();
     toast(!navigator.onLine?'No connection. Your changes stay on this phone.':NET.fails?'Couldn\'t reach the vault. Your changes stay on this phone.':'Synced');});
-  $('#cx-edit').addEventListener('click',()=>{sheetClose();showSetup(true);});
   $('#cx-reload').addEventListener('click',()=>{sheetClose();APPS.forEach(a=>loadApp(a));});
   $('#cx-diag').href='diag.html?shell='+encodeURIComponent(JSON.stringify({ins:insets(),app:appInsets(),strips:osStrips(),standalone:STANDALONE}));
+  $('#cx-diag').addEventListener('click',e=>{e.preventDefault();location.replace($('#cx-diag').href);});
+  $('#set-pgdl').addEventListener('click',()=>{if(!navigator.onLine){toast('It needs a connection.');return;}pgDownload().catch(()=>{}).then(sheetRefresh);sheetRefresh();});
+  $('#set-clear').addEventListener('click',async()=>{
+    if(!navigator.onLine){toast('Not while offline: the apps would have nothing to open.');return;}
+    if(!confirm('Clear the copies kept on this phone? Both apps download again (about 4 MB, and 17 MB more for the SQL engine). Your key and unsaved changes stay.'))return;
+    await DB.clear('files');const ks=await DB.keys('kv');for(const k of ks)if(!/^local:|^logs$/.test(k))await DB.del('kv',k);location.reload();});
+  $('#cx-edit').addEventListener('click',()=>{sheetClose();showSetup(true);});
   $('#cx-forget').addEventListener('click',async()=>{
     if(pending()&&!confirm('There are changes that haven\'t reached the vault yet. Forget this phone anyway? They will be lost.'))return;
-    if(!pending()&&!confirm('Forget the gatekeeper and clear everything cached on this phone?'))return;
+    if(!pending()&&!confirm('Forget the gatekeeper and clear everything kept on this phone?'))return;
     localStorage.removeItem(CFG_KEY);await DB.clear('files');await DB.clear('kv');location.reload();});
-});
+}
+$('#status').addEventListener('click',openSettings);
+$('#gear').addEventListener('click',openSettings);
 
 /* ══ boot ══ */
 let booted=false;
@@ -1489,7 +1641,7 @@ async function boot(){
   let reg=null;
   try{reg=await(await fetch('apps.json',{cache:'no-cache'})).json();}catch(e){}
   if(!reg)reg=await DB.get('kv','apps');else DB.put('kv','apps',reg);
-  APPS=(reg&&reg.apps)||[];
+  APPS=orderApps((reg&&reg.apps)||[]);
   for(const a of APPS){const g=await DB.get('kv','glance:'+a.id);if(g)GL[a.id]=g;}
   NOTES=(await DB.get('kv','notes'))||null;
   LOGQ=(await DB.get('kv','logs'))||[];
@@ -1501,8 +1653,13 @@ async function boot(){
 function start(){
   booted=true;
   APPS.forEach(a=>{const w=ensureWin(a);w.el.classList.add('on');});
-  const o=P.get('open'),oi=APPS.findIndex(a=>a.id===o);
-  if(oi>=0)idx=oi;
+  /* launch: straight into the last app he was in (or the Timetable, per Settings, and on the very first launch);
+     home is reached by pinching. ?home=1 starts on home, ?open=<id> in a given app (tests) */
+  const tt=APPS.find(a=>a.kind==='tt')||APPS[0];
+  let o=P.get('open');
+  if(!o&&P.get('home')!=='1')o=(PREF.openTo==='last'&&LAST.app&&APPS.some(a=>a.id===LAST.app))?LAST.app:(tt&&tt.id);
+  const oi=APPS.findIndex(a=>a.id===o);
+  if(oi>=0){idx=oi;setLast(APPS[oi]);}
   renderLabels();
   if(oi>=0){mode='app';document.body.classList.remove('stack');place();document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);
     APPS.forEach((a,i)=>{if(i!==idx)WIN[a.id].el.classList.remove('on');});WIN[APPS[idx].id].el.style.zIndex=30;
