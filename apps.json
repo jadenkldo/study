@@ -1,5 +1,5 @@
 {
-  "about": "The phone shell's app registry. One entry per study app; a new app is one more entry. kind picks the host protocol the shell speaks (tt = the study-timetable plugin's, ss = the study-space plugin's). file and state are vault paths the gatekeeper allows. glance picks the line under the card. look is the app's own paper (its card before it loads, and the status band above it) and bar is its tab bar colour (the page below it).",
+  "about": "The phone shell's app registry. One entry per study app; a new app is one more entry. kind picks the host protocol the shell speaks (tt = the study-timetable plugin's, ss = the study-space plugin's). file and state are vault paths the gatekeeper allows. glance picks the line under the card. look is the app's own paper (its card before it loads, and the status band above it) bar is its tab bar colour (the page below it), and top is the colour of its header area (the shell's blur cap above it).",
   "apps": [
     {
       "id": "tt",
@@ -14,14 +14,16 @@
           "line": "#e4e0d8",
           "ink": "#2b2723",
           "muted": "#6a635b",
-          "bar": "#ffffff"
+          "bar": "#ffffff",
+          "top": "#faf9f7"
         },
         "dark": {
           "paper": "#0c0c0c",
           "line": "#303030",
           "ink": "#e8e4dc",
           "muted": "#969696",
-          "bar": "#161616"
+          "bar": "#161616",
+          "top": "#0c0c0c"
         }
       }
     },
@@ -38,14 +40,16 @@
           "line": "#d3dae7",
           "ink": "#131a2a",
           "muted": "#55607a",
-          "bar": "#ffffff"
+          "bar": "#ffffff",
+          "top": "#e9edf4"
         },
         "dark": {
           "paper": "#0f1420",
           "line": "#2d3852",
           "ink": "#eaeef7",
           "muted": "#a3adc2",
-          "bar": "#171e2e"
+          "bar": "#171e2e",
+          "top": "#0f1420"
         }
       }
     }

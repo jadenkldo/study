@@ -74,6 +74,12 @@ h1,h2,h3,.serif{font-family:var(--font-display);font-weight:600;letter-spacing:-
 /* the open app is exactly the visible page: fixed to all four edges, never larger. (Some iOS home-screen builds keep a
    system bar at the top and a band at the bottom that a page cannot paint; those are coloured with theme-color.) */
 #wins{position:fixed;inset:0;pointer-events:none;z-index:10;overflow:hidden;}
+/* the blur cap: iOS 27 blurs and fades the top of a home-screen app's page, from the status bar to a little below the
+   top inset. Blurring a flat colour shows nothing, so while an app is open a solid band of the app's own top colour sits
+   over that zone, and the app's header starts below it. Above the app, below the grab band; never takes a touch.
+   Hidden on the home stack and while an app is being shrunk home. Its depth is BLUR_CLEAR (script). */
+#cap{position:fixed;left:0;right:0;top:0;height:var(--capH,0px);background:var(--capc,var(--bg));z-index:35;pointer-events:none;}
+body.stack #cap,body.gz #cap{display:none;}
 .win{position:absolute;inset:0;visibility:hidden;pointer-events:none;overflow:hidden;background:var(--wp);}
 .win.on{visibility:visible;pointer-events:auto;}
 .win iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:var(--wp);}
@@ -224,6 +230,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 <div class="island" aria-hidden="true"></div><div class="clock num" aria-hidden="true">7:09</div>
 <header id="hd"><h1 id="date">Today</h1><span class="wk num" id="wk"></span></header>
 <div id="wins"></div>
+<div id="cap" aria-hidden="true"></div>
 <div id="labels" role="list" aria-label="Apps"></div>
 <div id="deck" aria-hidden="true"></div>
 <div id="grab" role="button" tabindex="0" aria-label="Back to all apps"><i></i></div>
@@ -304,7 +311,8 @@ let canvasApp=null;
 function canvasFor(a){
   canvasApp=a||null;
   const r=document.documentElement.style;
-  if(a)r.setProperty('--canvas',look(a).bar||look(a).paper);else r.removeProperty('--canvas');
+  if(a){r.setProperty('--canvas',look(a).bar||look(a).paper);r.setProperty('--capc',look(a).top||look(a).paper);}
+  else{r.removeProperty('--canvas');r.removeProperty('--capc');}
 }
 applyTheme();
 
@@ -327,8 +335,12 @@ function osStrips(){
   return full-h>=30;
 }
 const TAB_PAD=6;
-const appInsets=()=>{const i=insets();return{t:i.t,b:osStrips()?TAB_PAD:i.b,l:i.l,r:i.r};};
-function applyPads(){document.documentElement.style.setProperty('--pb',(osStrips()?TAB_PAD:insets().b)+'px');}
+/* how far below the top inset iOS 27's blur reaches (≈75pt with a 59pt inset on Jaden's 15 Pro Max, Oct 2026):
+   the cap covers inset + BLUR_CLEAR, and the apps' headers start there. Tune this one number from a screenshot. */
+const BLUR_CLEAR=20;
+const capH=()=>osStrips()?insets().t+BLUR_CLEAR:0;
+const appInsets=()=>{const i=insets(),st=osStrips();return{t:st?i.t+BLUR_CLEAR:i.t,b:st?TAB_PAD:i.b,l:i.l,r:i.r};};
+function applyPads(){const r=document.documentElement.style;r.setProperty('--pb',(osStrips()?TAB_PAD:insets().b)+'px');r.setProperty('--capH',capH()+'px');}
 
 /* ══ storage: IndexedDB holds every file fetched from the vault (keyed by path, stamped with Drive's modified time),
    the last state each app saved while offline, the glances and the note list ══ */
@@ -1233,7 +1245,7 @@ const SHRINK_AT=.22,FLICK=.0025;
 let gz=null;
 function shrinkStart(){
   if(mode!=='app'||gz)return false;
-  const t=performance.now();gz={p:0,v:0,lt:t};document.body.classList.remove('anim');canvasFor(null);
+  const t=performance.now();gz={p:0,v:0,lt:t};document.body.classList.remove('anim');document.body.classList.add('gz');canvasFor(null);
   APPS.forEach((a,i)=>{if(i===idx)return;const w=ensureWin(a);w.el.classList.add('on');});place();return true;
 }
 function shrinkTo(p){
@@ -1246,7 +1258,7 @@ function shrinkTo(p){
   $('#grab').style.transform=`translate(${x+g.W*s/2-g.W/2}px,${y}px)`;
 }
 function shrinkEnd(){
-  if(!gz)return;const{p}=gz,v=performance.now()-gz.lt>90?0:gz.v;gz=null;$('#grab').style.transform='';
+  if(!gz)return;const{p}=gz,v=performance.now()-gz.lt>90?0:gz.v;gz=null;$('#grab').style.transform='';document.body.classList.remove('gz');
   const close=v>FLICK?p>.03:v<-FLICK?false:p>SHRINK_AT;
   if(close){toStack();return;}
   canvasFor(APPS[idx]);document.body.classList.add('anim');place();settle(()=>{if(mode!=='app')return;document.body.classList.remove('anim');
