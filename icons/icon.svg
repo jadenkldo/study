@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Study desk icon: one line of your notes, highlighted. Warm Paper, pencil rules, the highlighter for "now". -->
+  <rect width="1024" height="1024" fill="#faf9f7"/>
+  <g stroke-linecap="round" fill="none">
+    <path d="M232 318H792" stroke="#cec8bc" stroke-width="44"/>
+    <path d="M232 706H640" stroke="#cec8bc" stroke-width="44"/>
+  </g>
+  <path d="M196 438 L842 418 L836 600 L190 620 Z" fill="#ffd447" stroke="#ffd447" stroke-width="22" stroke-linejoin="round"/>
+  <path d="M248 516H776" stroke="#2b2723" stroke-width="50" stroke-linecap="round"/>
+</svg>

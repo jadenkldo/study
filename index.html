@@ -1,0 +1,1282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Study">
+<meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0c0c" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<title>Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+<script src="vendor/marked.min.js" defer></script>
+<!-- The phone shell. Home IS the switcher: every study app is a live card, exactly as you left it, laid side by side
+     with the next one peeking in. Tap a card to step into it. Two ways back, one gesture: pinch inside any app, or drag
+     the grab bar under the Dynamic Island down; either way the app shrinks back into its card under your fingers.
+     The shell plays the Obsidian plugins' part: it loads each app's real file from the vault (through the gatekeeper),
+     runs it in the same sandboxed srcdoc frame, and answers the same messages. See system/phone.md. -->
+<style>
+/* ══ Shell tokens: the shell sits on the timetable's Warm Paper (dark: Night Desk) and writes in pencil, never in either app's pen ══ */
+:root{
+  --bg:#faf9f7;--surface:#ffffff;--surface-dim:#f4f2ee;--border:#e4e0d8;--border2:#cec8bc;
+  --text:#2b2723;--text2:#6a635b;--text3:#726b62;--rule3:#a29b92;
+  --duesoon:#8f5706;--overdue:#c51e1e;--ok:#137638;
+  --mark:#ffd447;--on-mark:#1c1600;
+  --overlay:rgba(38,34,30,.34);
+  --font-ui:'DM Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-display:'Fraunces','Fraunces Fallback','Iowan Old Style',Georgia,serif;
+  --font-mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px);
+  --sal:env(safe-area-inset-left,0px);--sar:env(safe-area-inset-right,0px);
+  --ease:cubic-bezier(.16,1,.3,1);
+  color-scheme:light;
+}
+:root[data-theme="dark"]{
+  --bg:#0c0c0c;--surface:#161616;--surface-dim:#111111;--border:#242424;--border2:#303030;
+  --text:#e8e4dc;--text2:#969696;--text3:#8a8a8a;--rule3:#3e3e3e;
+  --duesoon:#fbbf24;--overdue:#f87171;--ok:#86efac;
+  --overlay:rgba(0,0,0,.62);
+  color-scheme:dark;
+}
+@font-face{font-family:'Fraunces Fallback';src:local('Georgia');size-adjust:92.8%;}
+html.sim{--sat:59px;--sab:34px;}
+*{box-sizing:border-box;margin:0;padding:0;}
+[hidden]{display:none!important;}
+html,body{height:100%;}
+body{background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:15px;line-height:1.45;overflow:hidden;
+  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit;-webkit-appearance:none;appearance:none;}
+a{color:inherit;}
+::selection{background:color-mix(in srgb,var(--text2) 24%,transparent);}
+:focus{outline:none;}
+:focus-visible{outline:2px solid var(--text);outline-offset:2px;border-radius:8px;}
+svg{fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;flex:none;}
+.num{font-variant-numeric:tabular-nums;}
+h1,h2,h3,.serif{font-family:var(--font-display);font-weight:600;letter-spacing:-.015em;line-height:1.15;text-wrap:balance;}
+.mut{color:var(--text2);}
+.over{color:var(--overdue);font-weight:600;}
+.soon{color:var(--duesoon);}
+.urgent{color:var(--duesoon);font-weight:600;}
+.cw{font-weight:600;color:var(--c);letter-spacing:.01em;}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);flex:none;}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+/* live app windows: kept alive once opened, so switching is instant and each app keeps its place */
+#wins{position:fixed;inset:0;pointer-events:none;z-index:10;}
+.win{position:absolute;inset:0;visibility:hidden;pointer-events:none;overflow:hidden;background:var(--wp);}
+.win.on{visibility:visible;pointer-events:auto;}
+.win iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:var(--wp);}
+.win .wait{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;padding:40px;text-align:center;color:var(--wm);font-size:17px;line-height:1.4;}
+.win .wait b{font:600 30px/1.15 var(--font-display);letter-spacing:-.015em;color:var(--wi);}
+.win .wait button{margin-top:10px;min-height:48px;padding:0 22px;border-radius:10px;border:1px solid var(--wl);color:var(--wi);font-weight:600;pointer-events:auto;}
+#sa{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+/* sim-only: where the Dynamic Island sits, so the safe area reads in screenshots */
+.island,.clock{display:none;}
+html.sim .island{display:block;position:fixed;top:11px;left:50%;width:126px;height:37px;margin-left:-63px;background:#000;border-radius:20px;z-index:200;pointer-events:none;}
+html.sim .clock{display:block;position:fixed;top:17px;left:calc(50% - 170px);font:600 17px/1 var(--font-ui);color:var(--clock,var(--text));z-index:200;pointer-events:none;}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto!important;}}
+
+#hd{position:fixed;left:0;right:0;top:0;z-index:5;padding:calc(var(--sat) + 16px) calc(22px + var(--sar)) 0 calc(22px + var(--sal));display:flex;align-items:baseline;justify-content:space-between;gap:12px;}
+#hd h1{font-size:28px;white-space:nowrap;}
+#hd .wk{color:var(--text2);white-space:nowrap;}
+/* cards: the live app windows themselves, scaled; never snapshots */
+.win{transform-origin:0 0;will-change:transform;}
+body.anim .win{transition:transform .46s var(--ease),border-radius .46s var(--ease),box-shadow .3s;}
+body.stack .win{box-shadow:0 18px 50px rgba(40,36,30,.16),0 0 0 2px rgba(40,36,30,.07);}
+:root[data-theme="dark"] body.stack .win{box-shadow:0 0 0 2px #2c2c2c;}
+body.stack .win iframe,body.held .win iframe{pointer-events:none;}  /* a held grab bar keeps every move, even over an app frame */
+#labels{position:fixed;inset:0;z-index:15;pointer-events:none;transition:opacity .2s;}
+body:not(.stack) #labels{opacity:0;transition:opacity .12s;}
+.lab{position:absolute;left:0;top:0;display:block;text-align:left;padding:0 2px;pointer-events:none;}
+.lab .nm{font-family:var(--font-display);font-weight:600;font-size:21px;letter-spacing:-.015em;line-height:1.2;display:block;margin-bottom:3px;}
+.lab .g{display:block;font-size:14px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.lab:focus-visible{outline:2px solid var(--text);outline-offset:4px;}
+body.anim .lab{transition:transform .46s var(--ease);}
+#deck{position:fixed;inset:0;z-index:20;display:none;touch-action:pan-y;}
+body.stack #deck{display:block;}
+/* the grab bar: a sheet handle under the Dynamic Island. The 44px hit zone lives in the safe-area band, above both apps'
+   own top bars; only the 5px bar shows */
+#grab{position:fixed;left:50%;width:200px;margin-left:-100px;z-index:40;display:none;touch-action:none;cursor:grab;}
+body:not(.stack) #grab{display:block;}
+#grab i{position:absolute;left:50%;bottom:3px;width:38px;height:5px;margin-left:-19px;border-radius:3px;background:var(--grab,#6a635b);opacity:.5;transition:opacity .15s,transform .2s var(--ease);}
+#grab.held i{opacity:.8;transform:scaleX(1.2);}
+#grab:focus-visible{outline:2px solid var(--grab);outline-offset:-2px;border-radius:12px;}
+/* sync line: the one quiet word on how the phone stands with the vault; tap it for the connection sheet */
+#status{position:fixed;left:50%;bottom:calc(var(--sab) + 2px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
+  font-size:13px;color:var(--text3);white-space:nowrap;border-radius:99px;transition:opacity .2s;}
+#status i{width:7px;height:7px;border-radius:50%;background:var(--rule3);flex:none;}
+#status.warn{color:var(--duesoon);} #status.warn i{background:#f0a81c;}
+#status.bad{color:var(--overdue);} #status.bad i{background:var(--overdue);}
+#status:active{background:var(--surface-dim);}
+body:not(.stack) #status{opacity:0;pointer-events:none;}
+@media (orientation:landscape) and (max-height:520px){#hd{padding-top:12px;}}
+@media (max-width:380px){#hd h1{font-size:24px;}.lab .nm{font-size:19px;}.lab .g{font-size:13.5px;}}
+
+/* ══ the reading sheet: notes, PDFs and the connection panel, read-only, on the shell's own paper ══ */
+#sheet{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);visibility:hidden;
+  transition:transform .42s var(--ease),visibility 0s linear .42s;}
+#sheet.open{transform:none;visibility:visible;transition:transform .42s var(--ease);}
+#sheet>header{flex:none;display:flex;align-items:center;gap:2px;min-height:56px;padding:calc(var(--sat) + 4px) calc(6px + var(--sar)) 4px calc(6px + var(--sal));
+  border-bottom:1px solid var(--border);touch-action:none;}
+#sheet>header h2{flex:1;min-width:0;font-size:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px;}
+#sheet>header h2 small{display:block;font:500 12.5px/1.3 var(--font-ui);letter-spacing:0;color:var(--text2);}
+.ib{width:44px;height:44px;display:grid;place-items:center;border-radius:10px;color:var(--text2);flex:none;}
+.ib svg{width:22px;height:22px;}
+.ib:active{background:var(--surface-dim);color:var(--text);}
+#sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px calc(20px + var(--sar)) calc(var(--sab) + 48px) calc(20px + var(--sal));}
+#sheet .body:focus{outline:none;}
+.md{max-width:65ch;margin:0 auto;font-size:16px;line-height:1.6;overflow-wrap:break-word;}
+.md>*+*{margin-top:.8em;}
+.md h1,.md h2,.md h3,.md h4,.md h5,.md h6{margin-top:1.6em;margin-bottom:-.2em;scroll-margin-top:16px;}
+.md>:first-child{margin-top:0;}
+.md h1{font-size:26px;}.md h2{font-size:21px;}.md h3{font-size:18px;}.md h4,.md h5,.md h6{font-size:16px;}
+.md p,.md li{text-wrap:pretty;}
+.md strong{font-weight:600;}
+.md ul,.md ol{padding-left:1.35em;}
+.md li+li{margin-top:.25em;}
+.md li>ul,.md li>ol{margin-top:.25em;}
+.md li::marker{color:var(--text3);}
+.md a{color:var(--text);text-decoration:underline;text-decoration-color:var(--border2);text-decoration-thickness:1.5px;text-underline-offset:3px;}
+.md a:active{text-decoration-color:var(--text);}
+.md code{font:.88em/1.4 var(--font-mono);background:var(--surface-dim);border:1px solid var(--border);border-radius:6px;padding:.08em .35em;}
+.md pre{background:var(--surface-dim);border:1px solid var(--border);border-radius:10px;padding:12px 14px;overflow-x:auto;font-size:14px;line-height:1.5;}
+.md pre code{background:none;border:0;padding:0;font-size:inherit;}
+.md .tw{overflow-x:auto;border:1px solid var(--border);border-radius:10px;}
+.md table{border-collapse:collapse;font-size:14.5px;min-width:100%;font-variant-numeric:tabular-nums;}
+.md th,.md td{padding:8px 12px;border-bottom:1px solid var(--border);text-align:left;vertical-align:top;}
+.md th{font-weight:600;background:var(--surface-dim);}
+.md tr:last-child td{border-bottom:0;}
+.md blockquote,.md .callout{background:var(--surface-dim);border-radius:10px;padding:12px 16px;color:var(--text);}
+.md blockquote>*+*,.md .callout>*+*{margin-top:.6em;}
+.md .callout .ct{font-weight:600;}
+.md details.callout{padding:0 16px;}
+.md details.callout>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;}
+.md details.callout>summary::-webkit-details-marker{display:none;}
+.md details.callout>summary::after{content:'';width:8px;height:8px;border-right:1.75px solid var(--text2);border-bottom:1.75px solid var(--text2);transform:rotate(45deg) translateY(-3px);transition:transform .2s var(--ease);flex:none;margin-right:4px;}
+.md details.callout[open]>summary::after{transform:rotate(225deg) translate(-2px,-1px);}
+.md details.callout[open]{padding-bottom:14px;}
+.md details.callout>summary+*{margin-top:0;}
+.md hr{border:0;border-top:1px solid var(--border);margin:1.6em 0;}
+.md img{max-width:100%;height:auto;border-radius:8px;display:block;}
+.md mark{background:color-mix(in srgb,var(--mark) 62%,transparent);color:inherit;border-radius:3px;padding:0 .12em;}
+:root[data-theme="dark"] .md mark{background:color-mix(in srgb,var(--mark) 30%,transparent);}
+.md input[type=checkbox]{accent-color:var(--text2);margin-right:.4em;}
+.md .missing{color:var(--text3);font-style:italic;}
+.md .katex{font-size:1.05em;}
+.sheet-lead{color:var(--text2);max-width:46ch;margin:0 auto 22px;font-size:15.5px;}
+.acts{max-width:440px;margin:0 auto;display:grid;gap:10px;}
+.rowinfo{max-width:440px;margin:0 auto 20px;border-top:1px solid var(--border);}
+.rowinfo div{display:flex;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--border);font-size:14.5px;}
+.rowinfo div span:last-child{color:var(--text2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ══ buttons & fields (setup, sheets) ══ */
+.btn{min-height:48px;border-radius:10px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:0 18px;text-decoration:none;font-size:15.5px;}
+.btn.mark{background:var(--mark);color:var(--on-mark);}
+.btn.mark:active{filter:brightness(.96);}
+.btn.quiet{background:var(--surface);border:1px solid var(--border2);color:var(--text);}
+.btn.quiet:active{background:var(--surface-dim);}
+.btn.danger{color:var(--overdue);}
+.btn[disabled]{opacity:.6;cursor:default;}
+.btn svg{width:19px;height:19px;}
+
+#setup{position:fixed;inset:0;z-index:80;background:var(--bg);overflow-y:auto;display:none;}
+#setup.on{display:block;}
+#setup main{max-width:440px;margin:0 auto;padding:calc(var(--sat) + 44px) calc(24px + var(--sar)) calc(var(--sab) + 32px) calc(24px + var(--sal));}
+#setup h1{font-size:30px;margin-bottom:12px;}
+#setup .lead{color:var(--text2);font-size:15.5px;max-width:40ch;}
+.field{margin-top:24px;}
+.field label{display:block;font-size:13.5px;font-weight:600;color:var(--text2);margin-bottom:7px;}
+.field input{width:100%;height:50px;border:1px solid var(--border2);border-radius:10px;background:var(--surface);color:var(--text);
+  font:16px/1 var(--font-ui);padding:0 14px;caret-color:var(--text);}
+.field input::placeholder{color:var(--text3);}
+.field input:focus-visible{outline:2px solid var(--text);outline-offset:1px;}
+#setup .err{color:var(--overdue);font-size:14.5px;margin-top:16px;min-height:21px;}
+#setup .go{margin-top:8px;}
+#setup .foot{margin-top:28px;font-size:13.5px;color:var(--text3);}
+#setup .cancel{margin-top:10px;}
+#setup .prog{margin-top:24px;display:none;}
+#setup.busy .prog{display:block;}
+#setup .bar{height:4px;border-radius:3px;background:var(--surface-dim);overflow:hidden;margin-top:10px;}
+#setup .bar i{display:block;height:100%;width:100%;background:var(--text2);border-radius:3px;transform:scaleX(0);transform-origin:0 50%;transition:transform .3s var(--ease);}
+
+#toast{position:fixed;left:50%;bottom:calc(var(--sab) + 56px);transform:translate(-50%,12px);z-index:90;max-width:min(92vw,420px);
+  background:var(--text);color:var(--bg);border-radius:12px;padding:12px 16px;font-size:14.5px;line-height:1.35;opacity:0;pointer-events:none;
+  transition:opacity .2s,transform .3s var(--ease);}
+#toast.on{opacity:1;transform:translate(-50%,0);}
+</style>
+</head>
+<body class="stack">
+<div id="sa" aria-hidden="true"></div>
+<div class="island" aria-hidden="true"></div><div class="clock num" aria-hidden="true">7:09</div>
+<header id="hd"><h1 id="date">Today</h1><span class="wk num" id="wk"></span></header>
+<div id="wins"></div>
+<div id="labels" role="list" aria-label="Apps"></div>
+<div id="deck" aria-hidden="true"></div>
+<div id="grab" role="button" tabindex="0" aria-label="Back to all apps"><i></i></div>
+<button id="status" type="button" aria-live="polite"><i aria-hidden="true"></i><span>Starting</span></button>
+
+<section id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-t" aria-hidden="true">
+  <header>
+    <button class="ib" id="sh-back" type="button" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <h2 id="sh-t"></h2>
+    <button class="ib" id="sh-x" type="button" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </header>
+  <div class="body" id="sh-b" tabindex="-1"></div>
+</section>
+
+<section id="setup" aria-labelledby="su-t">
+  <main>
+    <h1 id="su-t">Connect to your vault</h1>
+    <p class="lead">The phone reads your two study apps from Google Drive and saves your ticks back through the gatekeeper script. Paste its web app URL and key from the setup steps. Both stay on this phone.</p>
+    <form id="su-f" novalidate>
+      <div class="field"><label for="su-url">Gatekeeper URL</label>
+        <input id="su-url" type="url" inputmode="url" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" required></div>
+      <div class="field"><label for="su-key">Key</label>
+        <input id="su-key" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="The key setup() printed" required></div>
+      <p class="err" id="su-err" role="alert"></p>
+      <button class="btn mark go" id="su-go" type="submit">Connect</button>
+      <button class="btn quiet cancel" id="su-cancel" type="button" hidden>Cancel</button>
+    </form>
+    <div class="prog" aria-live="polite"><span id="su-p">Fetching your apps from Drive</span><div class="bar"><i id="su-bar"></i></div></div>
+    <p class="foot">Lost the key? Open the script, run <b>newKey</b>, and paste the new one here.</p>
+  </main>
+</section>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+/* ══ Shell core ══
+   URL params (testing and screenshots only): theme=light|dark · sim=1 (iPhone 15 Pro Max safe areas) · open=<app id>
+   (start inside an app) · drag=0.4 (freeze a grab-bar drag part-way, with open=) */
+const P=new URLSearchParams(location.search);
+const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
+const TP=P.get('theme');
+const isDark=()=>TP==='dark'||(TP!=='light'&&MQ.matches);
+const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const MS_DAY=864e5,pad=n=>String(n).padStart(2,'0');
+const DAYL=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const MONL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const isoOf=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+if(P.get('sim')==='1')document.documentElement.classList.add('sim');
+/* stable JSON: key order never decides whether two states differ */
+function canon(v){
+  if(v===null||typeof v!=='object')return JSON.stringify(v===undefined?null:v);
+  if(Array.isArray(v))return '['+v.map(canon).join(',')+']';
+  return '{'+Object.keys(v).sort().filter(k=>v[k]!==undefined).map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}';
+}
+const IC={
+  back:'<path d="M15 6l-6 6 6 6"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  ext:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/>',
+  note:'<path d="M6.5 3.5h8l4 4v13h-12z"/><path d="M14.5 3.5v4h4M9.5 12h6M9.5 15.5h6"/>',
+};
+const svg=k=>`<svg viewBox="0 0 24 24" aria-hidden="true">${IC[k]}</svg>`;
+
+/* ---------- toast ---------- */
+let toastT=0;
+function toast(msg,ms=3200){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),ms);}
+
+/* ---------- theme: follows the iPhone ---------- */
+function applyTheme(){
+  document.documentElement.dataset.theme=isDark()?'dark':'light';
+}
+applyTheme();
+
+/* ---------- safe areas: the shell measures them once and hands each app the numbers (env() reads 0 inside a frame) ---------- */
+function insets(){
+  if(document.documentElement.classList.contains('sim'))return innerWidth>innerHeight?{t:0,b:21,l:59,r:59}:{t:59,b:34,l:0,r:0};
+  const cs=getComputedStyle($('#sa'));
+  return{t:parseFloat(cs.paddingTop)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0,r:parseFloat(cs.paddingRight)||0};
+}
+/* the bar needs no room where there is a status-bar band to sit in; without one (landscape, desktop) it takes 20px */
+const grabBand=()=>insets().t>=44?0:20;
+const appInsets=()=>{const i=insets();return{t:i.t+grabBand(),b:i.b,l:i.l,r:i.r};};
+
+/* ══ storage: IndexedDB holds every file fetched from the vault (keyed by path, stamped with Drive's modified time),
+   the last state each app saved while offline, the glances and the note list ══ */
+const DB={
+  db:null,
+  open(){return new Promise((res,rej)=>{const r=indexedDB.open('study-shell',1);
+    r.onupgradeneeded=()=>{const d=r.result;if(!d.objectStoreNames.contains('files'))d.createObjectStore('files');if(!d.objectStoreNames.contains('kv'))d.createObjectStore('kv');};
+    r.onsuccess=()=>{DB.db=r.result;res();};r.onerror=()=>rej(r.error);});},
+  tx(store,mode,fn){return new Promise((res,rej)=>{if(!DB.db)return res(undefined);const t=DB.db.transaction(store,mode),s=t.objectStore(store);const r=fn(s);
+    t.oncomplete=()=>res(r&&'result'in r?r.result:undefined);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error);});},
+  get(store,k){return DB.tx(store,'readonly',s=>s.get(k)).catch(()=>undefined);},
+  put(store,k,v){return DB.tx(store,'readwrite',s=>s.put(v,k)).catch(e=>console.warn('shell: could not cache',k,e));},
+  del(store,k){return DB.tx(store,'readwrite',s=>s.delete(k)).catch(()=>{});},
+  clear(store){return DB.tx(store,'readwrite',s=>s.clear()).catch(()=>{});},
+};
+
+/* ══ the gatekeeper: JSON over a text/plain POST (no CORS preflight), every call carries the key ══ */
+const CFG_KEY='study-shell.gatekeeper';
+let GK=null;try{GK=JSON.parse(localStorage.getItem(CFG_KEY)||'null');}catch(e){}
+class NetError extends Error{}
+class GateError extends Error{}
+const NET={down:false,last:0,err:''};
+async function api(action,args,{timeout=60000,cfg=GK}={}){
+  if(!cfg)throw new GateError('not connected');
+  const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),timeout);
+  let r;
+  try{r=await fetch(cfg.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({key:cfg.key,action},args||{})),
+    redirect:'follow',cache:'no-store',credentials:'omit',signal:ctl.signal});}
+  catch(e){clearTimeout(t);NET.down=true;NET.err=String(e&&e.message||e);syncLine();throw new NetError('offline');}
+  clearTimeout(t);
+  let j;try{j=await r.json();}catch(e){throw new GateError('The gatekeeper answered with a web page, not data. Check the deployment gives access to Anyone.');}
+  if(NET.down){NET.down=false;syncLine();}
+  if(!j||!j.ok)throw new GateError(j&&j.error||'the gatekeeper refused');
+  return j;
+}
+
+/* ══ files ══ */
+const TEXT_EXT=/\.(html?|json|js|css|md|txt|svg)$/i;
+const FILES=new Map();            /* in-memory text files */
+const CHUNK=3*1024*1024;
+function b64ToBytes(b){const s=atob(b),n=s.length,u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=s.charCodeAt(i);return u;}
+function bytesToB64(buf){const u=new Uint8Array(buf);let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s);}
+function entryFrom(f,bytes){
+  const e={path:f.path,modified:f.modified,mime:f.mime,size:f.size};
+  if(f.text!=null)e.text=f.text;
+  else if(f.link)e.link=f.link;
+  else if(bytes){if(TEXT_EXT.test(f.path))e.text=new TextDecoder().decode(bytes);else e.buf=bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength);}
+  return e;
+}
+async function remember(e){if(e.text!=null)FILES.set(e.path,e);await DB.put('files',e.path,e);return e;}
+async function fetchChunked(path,head){
+  for(let attempt=0;attempt<2;attempt++){
+    const first=await api('read',{path,offset:0,length:CHUNK});
+    const size=first.size,step=first.length||CHUNK,parts=[b64ToBytes(first.base64)],offs=[];
+    for(let o=step;o<size;o+=step)offs.push(o);
+    let i=0,moved=false;
+    const worker=async()=>{while(i<offs.length&&!moved){const k=i++;const r=await api('read',{path,offset:offs[k],length:step});if(r.modified!==first.modified){moved=true;return;}parts[k+1]=b64ToBytes(r.base64);}};
+    await Promise.all([worker(),worker(),worker()]);
+    if(moved)continue; /* the file changed mid-download (Drive sync); start again */
+    const all=new Uint8Array(size);let o=0;for(const p of parts){all.set(p,o);o+=p.length;}
+    return entryFrom(Object.assign({},head||{},{path,modified:first.modified,mime:first.mime,size}),all);
+  }
+  throw new GateError('the file kept changing while downloading: '+path);
+}
+/* fetch a batch fresh from the vault; big or binary files come down in chunks */
+async function fetchFiles(paths,onEach){
+  const out={};if(!paths.length)return out;
+  for(let i=0;i<paths.length;i+=12){
+    const r=await api('readMany',{paths:paths.slice(i,i+12)});
+    await Promise.all(Object.entries(r.files).map(async([p,f])=>{
+      if(f.error){out[p]={error:f.error};onEach&&onEach(p);return;}
+      const e=f.chunked?await fetchChunked(p,f):entryFrom(f,f.base64!=null?b64ToBytes(f.base64):null);
+      out[p]=await remember(e);onEach&&onEach(p);
+    }));
+  }
+  return out;
+}
+async function cached(path){if(FILES.has(path))return FILES.get(path);const e=await DB.get('files',path);if(e&&e.text!=null)FILES.set(path,e);return e||null;}
+async function getFile(path){const c=await cached(path);if(c)return c;const r=await fetchFiles([path]);if(!r[path]||r[path].error)throw new GateError((r[path]&&r[path].error)||'missing: '+path);return r[path];}
+async function getText(path){const e=await getFile(path);if(e.text==null)throw new GateError('not text: '+path);return e.text;}
+
+/* ══ the apps registry (apps.json): a future app is one entry ══ */
+let APPS=[];
+const look=a=>a.look[isDark()?'dark':'light'];
+const ssDir=a=>a.file.split('/').slice(0,-1).join('/');
+/* every vault file an app needs to start, worked out the way its plugin does */
+async function codePaths(a,{fetchMissing=true}={}){
+  if(a.kind==='tt')return[a.file];
+  if(a.kind==='ss'){
+    const d=ssDir(a),man=d+'/banks/manifest.js';
+    let mt=null;try{mt=fetchMissing?await getText(man):(await cached(man)||{}).text;}catch(e){}
+    const banks=mt?[...mt.matchAll(/["']banks\/([^"']+\.js)["']/g)].map(m=>d+'/banks/'+m[1]):[];
+    return[a.file,man,...banks,d+'/vendor/katex/katex-embedded.css',d+'/vendor/katex/katex.min.js',d+'/vendor/katex/auto-render.min.js',
+      d+'/vendor/sqljs/sql-wasm.js',d+'/vendor/sqljs/sql-wasm-b64.js'];
+  }
+  return[a.file];
+}
+const pgPaths=a=>['pglite.bundle.js','pglite.wasm','pglite.data','initdb.wasm'].map(f=>ssDir(a)+'/vendor/pglite/'+f);
+
+/* ══ assembling the srcdoc, exactly as the plugins do, plus the shell bridge ══ */
+/* The bridge runs inside the app's frame. It is host glue only: it never changes what the app does. It applies the
+   safe-area numbers, turns a two-finger pinch into the shell's "back home" gesture, and reads the card's glance from the
+   app's own engine (the same functions the app draws with, so the card can never disagree with the app). */
+function shellBridge(KIND,INS){
+  var css=document.createElement('style');css.id='shell-insets';(document.head||document.documentElement).appendChild(css);
+  function px(n){return Math.max(0,+n||0)+'px!important';}
+  function insets(i){css.textContent=KIND==='tt'
+    ?'body.phone{--ph-sat:'+px(i.t)+';--ph-sab:'+px(i.b)+';--ph-sal:'+px(i.l)+';--ph-sar:'+px(i.r)+'}'
+    :'html.phone{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}';}
+  insets(INS);
+  function post(m){try{parent.postMessage(m,'*');}catch(e){}}
+  function ttGlance(){
+    if(typeof getDay!=='function'||typeof KINDS==='undefined'||typeof SEMESTER==='undefined')return null;
+    var p2=function(n){return String(n).padStart(2,'0');},isoOf=function(d){return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());};
+    var now=new Date(),nowMs=+now,T=isoOf(now),K=KINDS,S=SEMESTER,C=S.courses||{};
+    var shown=function(t,k){var k2=K[t.kind];return k2&&k2.check&&t.course!=='event'&&t.kind!=='event'&&!(typeof choreHidden==='function'&&choreHidden(t,k));};
+    var today=(getDay(T).tasks||[]).filter(function(t){return shown(t,T);}),left=today.filter(function(t){return!t.done;});
+    var dueOf=function(t){var p=String(t.due).split('T'),a=p[0].split('-').map(Number),d=new Date(a[0],a[1]-1,a[2]);
+      if(p[1]){var h=p[1].split(':').map(Number);d.setHours(h[0]||0,h[1]||0);}else d.setHours(23,59);return d;};
+    var end=new Date(S.scanEnd[0],S.scanEnd[1],S.scanEnd[2]),items=[],seen={};
+    for(var d=new Date(now.getFullYear(),now.getMonth(),now.getDate()-28);d<=end;d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1)){
+      var k=isoOf(d);
+      (getDay(k).tasks||[]).forEach(function(t){
+        if(!t.due||t.done||!(K[t.kind]&&K[t.kind].check))return;
+        if(typeof bookedSlotMissed==='function'&&bookedSlotMissed(k,t,nowMs))return;
+        var key=k+t.course+t.kind+t.label+t.due;if(seen[key])return;seen[key]=1;items.push({t:t,due:dueOf(t)});
+      });
+    }
+    items.sort(function(a,b){return a.due-b.due;});
+    var next=null;for(var i=0;i<items.length;i++){if(items[i].due>=now&&['assign','exam','quiz','hw'].indexOf(items[i].t.kind)>=0){next=items[i];break;}}
+    var label=function(t){try{return typeof shownLabel==='function'?shownLabel(t):(t.label||'');}catch(e){return t.label||'';}};
+    var c=next&&C[next.t.course]||{};
+    return{today:T,week:typeof uniWeekNum==='function'?uniWeekNum(now):null,weeks:S.weeks,tag:typeof weekTag==='function'?weekTag(now):'',
+      left:left.length,total:today.length,over:items.filter(function(i){return i.due<now;}).length,
+      next:next?{short:c.short||next.t.course,light:c.light&&c.light[0],dark:c.dark&&c.dark[0],kind:next.t.kind,label:label(next.t),due:+next.due}:null};
+  }
+  function ssGlance(){
+    if(!window.QB||typeof S==='undefined')return null;
+    var now=Date.now(),day=new Date().toDateString(),srs=S.srs||{},att=S.attempts||[];
+    var subs=window.QB.map(function(b){
+      var ids={},due=0,known=0;(b.questions||[]).forEach(function(q){ids[q.id]=1;var r=srs[q.id];if(!r||!r.reps)return;if(r.box>=3)known++;if(now>=r.due)due++;});
+      var col=b.meta&&b.meta.colour;
+      return{title:b.meta.title,light:col&&col.light&&col.light[0],dark:col&&col.dark&&col.dark[0],due:due,known:known,total:(b.questions||[]).length,
+        today:att.filter(function(a){return ids[a.qid]&&new Date(a.ts).toDateString()===day;}).length};
+    });
+    var active=(S.settings&&S.settings.subject)||'';
+    subs.sort(function(a,b){return(b.title===active)-(a.title===active);});
+    return{subs:subs,active:active};
+  }
+  addEventListener('message',function(e){
+    if(e.source!==parent)return;var d=e.data;if(!d||typeof d!=='object')return;
+    if(d.type==='shell-insets')insets(d);
+    else if(d.type==='shell-glance?'){var g=null;try{g=KIND==='tt'?ttGlance():ssGlance();}catch(err){g={error:String(err&&err.message||err)};}post({type:'shell-glance',model:g});}
+  });
+  var d0=1,on=false;
+  function dist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
+  document.addEventListener('touchstart',function(e){if(e.touches.length===2){d0=dist(e.touches)||1;on=true;post({type:'shell-pinch',phase:'start'});}},{passive:true,capture:true});
+  document.addEventListener('touchmove',function(e){if(on&&e.touches.length===2){e.preventDefault();post({type:'shell-pinch',phase:'move',r:dist(e.touches)/d0});}},{passive:false,capture:true});
+  function end(e){if(on&&e.touches.length<2){on=false;post({type:'shell-pinch',phase:'end'});}}
+  document.addEventListener('touchend',end,{capture:true});document.addEventListener('touchcancel',end,{capture:true});
+  ['gesturestart','gesturechange'].forEach(function(t){document.addEventListener(t,function(e){e.preventDefault();});});
+  addEventListener('wheel',function(e){if(e.ctrlKey){e.preventDefault();post({type:'shell-wheel',dy:e.deltaY});}},{passive:false,capture:true});
+}
+const ETAG='</'+'script>';
+function withBridge(html,kind){
+  const tag='<script>/* phone shell bridge */('+shellBridge.toString()+')('+JSON.stringify(kind)+','+JSON.stringify(appInsets())+');'+ETAG;
+  const i=html.lastIndexOf('</body>');
+  return i<0?html+tag:html.slice(0,i)+tag+html.slice(i);
+}
+/* the study-space plugin's assembleHtml(): srcdoc cannot resolve relative src, so banks, KaTeX and sql.js go inline */
+async function assembleSS(a){
+  const d=ssDir(a);let html=await getText(a.file);
+  let inlined='';
+  try{
+    const manifest=await getText(d+'/banks/manifest.js');
+    inlined+='<script>'+manifest+ETAG;
+    const files=[...manifest.matchAll(/["']banks\/([^"']+\.js)["']/g)].map(m=>m[1]);
+    for(const f of files)inlined+='\n<script>'+(await getText(d+'/banks/'+f))+ETAG;
+    inlined+='\n<script>window.QB_FILES=[];'+ETAG;
+  }catch(e){console.error('shell: bank inline failed',e);}
+  html=html.replace('<script src="banks/manifest.js">'+ETAG,()=>inlined);
+  try{
+    const css=await getText(d+'/vendor/katex/katex-embedded.css');
+    html=html.replace('<link rel="stylesheet" href="vendor/katex/katex-embedded.css">',()=>'<style>'+css+'</style>');
+    const kjs=await getText(d+'/vendor/katex/katex.min.js'),ar=await getText(d+'/vendor/katex/auto-render.min.js');
+    html=html.replace('<script defer src="vendor/katex/katex.min.js">'+ETAG,()=>'<script>'+kjs+ETAG);
+    html=html.replace('<script defer src="vendor/katex/auto-render.min.js">'+ETAG,()=>'<script>'+ar+ETAG);
+  }catch(e){console.error('shell: katex inline failed',e);}
+  try{
+    const sjs=await getText(d+'/vendor/sqljs/sql-wasm.js'),sb64=await getText(d+'/vendor/sqljs/sql-wasm-b64.js');
+    html=html.replace('<script defer src="vendor/sqljs/sql-wasm.js">'+ETAG,()=>'<script>'+sjs+ETAG);
+    html=html.replace('<script defer src="vendor/sqljs/sql-wasm-b64.js">'+ETAG,()=>'<script>'+sb64+ETAG);
+  }catch(e){console.error('shell: sql.js inline failed',e);}
+  return html;
+}
+async function assemble(a){return withBridge(a.kind==='ss'?await assembleSS(a):await getText(a.file),a.kind);}
+
+/* ══ state sync: what each app saves goes to the gatekeeper, which merges it into the CURRENT file under a lock ══
+   base  = the file as the gatekeeper last gave it (and its Drive modified time)
+   local = the app's newest save not yet merged into the vault (kept in IndexedDB, so it survives a reload offline)
+   Timetable: only the top-level keys and the days that differ from base travel; days not in the patch keep the
+   server's version. Study Space: the whole state travels and the gatekeeper runs the plugin's mergeStates().
+   After a save the merged file goes back into the app, but only if it differs from what the app already has. */
+const SYNC={};
+let lastSync=0;
+function stateOf(id){const s=SYNC[id];return s?(s.local||s.base):null;}
+function diffTT(b,l){
+  const p={set:{},del:[],days:{}};b=b||{};
+  new Set([...Object.keys(b),...Object.keys(l)]).forEach(k=>{if(k==='days')return;
+    if(!(k in l)){p.del.push(k);return;}if(canon(b[k])!==canon(l[k]))p.set[k]=l[k];});
+  const bd=b.days||{},ld=l.days||{};
+  new Set([...Object.keys(bd),...Object.keys(ld)]).forEach(k=>{if(canon(bd[k])!==canon(ld[k]))p.days[k]=ld[k]===undefined?null:ld[k];});
+  return p;
+}
+const emptyPatch=p=>!Object.keys(p.set).length&&!p.del.length&&!Object.keys(p.days).length;
+function onAppSave(a,state){
+  const s=SYNC[a.id];if(!s||!state||typeof state!=='object')return;
+  s.local=state;s.appCanon=canon(state);
+  DB.put('kv','local:'+a.id,state);
+  clearTimeout(s.t);s.t=setTimeout(()=>flush(a.id),600);
+  syncLine();wantGlance(a.id,900);
+  if(a.kind==='tt')APPS.filter(b=>b.kind==='ss').forEach(b=>sendDue(b));
+}
+async function flush(id){
+  const s=SYNC[id];if(!s)return;
+  if(s.inflight){s.again=true;return;}
+  if(!s.local)return;
+  if(!GK)return;
+  s.inflight=true;syncLine();
+  const snap=s.local,a=APPS.find(x=>x.id===id);
+  try{
+    let body;
+    if(a.kind==='tt'){
+      const patch=diffTT(s.base,snap);
+      if(emptyPatch(patch)){if(s.local===snap){s.local=null;await DB.del('kv','local:'+id);}return;}
+      body={app:'tt',baseModified:s.baseMod,patch};
+    }else body={app:'ss',baseModified:s.baseMod,state:snap};
+    const r=await api('save',body);
+    s.base=r.state;s.baseMod=r.modified;lastSync=Date.now();s.retry=0;
+    await remember({path:a.state,modified:r.modified,mime:'application/json',text:JSON.stringify(r.state)});
+    if(s.local===snap){
+      s.local=null;await DB.del('kv','local:'+id);
+      if(canon(r.state)!==s.appCanon)pushState(a,r.state);   /* the other machine's changes, merged in */
+    }else s.again=true;
+  }catch(e){
+    s.retry=Math.min((s.retry||0)+1,6);
+    if(!(e instanceof NetError)){console.warn('shell: save failed',e);s.err=String(e.message||e);}
+    clearTimeout(s.rt);s.rt=setTimeout(()=>flush(id),Math.min(120000,5000*2**s.retry));
+  }finally{
+    s.inflight=false;syncLine();
+    if(s.again){s.again=false;setTimeout(()=>flush(id),0);}
+  }
+}
+function pushState(a,state){
+  const s=SYNC[a.id];if(s)s.appCanon=canon(state);
+  const W=WIN[a.id];if(!W||!W.ready)return;
+  post(W,{type:a.kind==='tt'?'tt-init':'ss-init',state});
+  if(a.kind==='tt')APPS.filter(b=>b.kind==='ss').forEach(b=>sendDue(b));
+  wantGlance(a.id,900);
+}
+/* error-log appends wait in a queue too, so a miss logged offline still lands */
+let LOGQ=[];
+async function flushLogs(){
+  if(flushLogs.busy||!LOGQ.length||!GK)return;flushLogs.busy=true;
+  try{
+    while(LOGQ.length){
+      const q=LOGQ[0];
+      try{await api('appendLog',{file:q.file,entry:q.entry});}
+      catch(e){if(e instanceof NetError)break;console.warn('shell: error log refused',e);toast('Could not write '+q.file.split('/').pop()+': '+(e.message||e));}
+      LOGQ.shift();await DB.put('kv','logs',LOGQ);
+      try{const f=await fetchFiles([q.file]);if(f[q.file]&&!f[q.file].error)APPS.filter(b=>b.kind==='ss').forEach(b=>sendLogs(b));}catch(e){}
+    }
+  }finally{flushLogs.busy=false;syncLine();}
+}
+const pending=()=>Object.values(SYNC).filter(s=>s.local).length+LOGQ.length;
+function syncLine(){
+  const b=$('#status');if(!b)return;const n=pending(),busy=Object.values(SYNC).some(s=>s.inflight);
+  let txt,cls='';
+  if(!GK)txt='Not connected';
+  else if(NET.down||!navigator.onLine){txt=n?`Offline · ${n} change${n>1?'s':''} waiting`:'Offline · showing your last copy';cls='warn';}
+  else if(busy)txt='Saving';
+  else if(n&&Object.values(SYNC).some(s=>s.err&&s.local)){txt=`Not saved yet · ${n} change${n>1?'s':''} kept on this phone`;cls='bad';}
+  else if(n)txt=`${n} change${n>1?'s':''} waiting`;
+  else if(lastSync)txt='Up to date · '+clock(new Date(lastSync));
+  else txt='Up to date';
+  b.className=cls;b.querySelector('span').textContent=txt;
+  b.setAttribute('aria-label',txt+'. Connection settings');
+}
+function clock(d){let h=d.getHours();const m=d.getMinutes(),ap=h>=12?'PM':'AM';h=h%12||12;return h+':'+pad(m)+ap;}
+
+/* ══ host protocol: the same answers the Obsidian plugins give ══ */
+const WIN={};
+let NOTES=null,INDEX=null;
+function post(W,msg,transfer){try{W.f.contentWindow.postMessage(msg,'*',transfer||[]);}catch(e){}}
+function themeMsgs(a){return a.kind==='tt'?[{type:'tt-theme',theme:isDark()?'dark':'light'}]:a.kind==='ss'?[{type:'ss-theme',dark:isDark(),accent:null}]:[];}
+addEventListener('message',e=>{
+  const W=Object.values(WIN).find(w=>w.f.contentWindow===e.source);if(!W)return;
+  const d=e.data;if(!d||typeof d!=='object'||typeof d.type!=='string')return;
+  const a=W.app;
+  if(d.type==='shell-pinch'){if(mode==='app'&&APPS[idx]===a)SHELL.pinch(d.phase,d.r);return;}
+  if(d.type==='shell-wheel'){if(mode==='app'&&APPS[idx]===a)wheelPinch(+d.dy||0);return;}
+  if(d.type==='shell-glance'){gotGlance(a,d.model);return;}
+  if(a.kind==='tt')ttMsg(W,a,d);else if(a.kind==='ss')ssMsg(W,a,d);
+});
+function ttMsg(W,a,d){
+  if(d.type==='tt-ready'){W.ready=true;post(W,{type:'tt-init',state:stateOf(a.id)});themeMsgs(a).forEach(m=>post(W,m));if(NOTES)post(W,{type:'tt-notes',notes:NOTES});wantGlance(a.id,1200);}
+  else if(d.type==='tt-save')onAppSave(a,d.state);
+  else if(d.type==='tt-open-note')openLectureNote(d.unit,d.week);
+  /* tt-summary feeds the desktop's course-page to-do and notifications: nothing to do on the phone */
+}
+function ssMsg(W,a,d){
+  if(d.type==='ss-ready'){W.ready=true;post(W,{type:'ss-init',state:stateOf(a.id)});themeMsgs(a).forEach(m=>post(W,m));sendDue(a);wantGlance(a.id,1200);}
+  else if(d.type==='ss-save')onAppSave(a,d.state);
+  else if(d.type==='ss-open'&&typeof d.path==='string')openPath(d.path);
+  else if(d.type==='ss-want-logs'&&Array.isArray(d.files)){W.logFiles=d.files.filter(f=>typeof f==='string'&&f.endsWith('.md'));sendLogs(a);}
+  else if(d.type==='ss-log'&&typeof d.entry==='string'&&typeof d.file==='string'&&d.file)appendLog(a,d.file,d.entry);
+  else if(d.type==='ss-want-pg')sendPg(a);
+  else if(d.type==='ss-want-slice'&&typeof d.note==='string'&&typeof d.heading==='string')sendSlice(a,d);
+  else if(d.type==='ss-want-fig'&&typeof d.path==='string')sendFig(a,d.path);
+  /* ss-split, ss-ask, ss-hotkey, ss-sel belong to the desktop (split panes, Ask Claude): ignored here, as is anything unknown */
+}
+
+/* READ-ONLY view of the study timetable for Study Space's "what is due next" line: the study-space plugin's
+   ttAssessments(), verbatim. Neither file is ever written from here. */
+function ttAssessments(html,state){
+  const a=html.indexOf('const SEMESTER=');if(a<0)return[];
+  const b=html.indexOf('\n};',a);if(b<0)return[];
+  let SEM;try{SEM=new Function('return ('+html.slice(a+'const SEMESTER='.length,b+2)+')')();}catch(e){return[];}
+  const KINDS=['quiz','assign','exam'];
+  const start=new Date(SEM.start[0],SEM.start[1],SEM.start[2]);
+  const addDays=(d,n)=>new Date(d.getFullYear(),d.getMonth(),d.getDate()+n);
+  const iso=(d)=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  const monday=(w)=>addDays(start,((w<=SEM.breakAfterWeek)?w-1:w)*7);
+  const base=(w)=>(w==='break')?addDays(start,SEM.breakAfterWeek*7):monday(w);
+  const seeds={};const add=(d,t)=>{const k=iso(d);(seeds[k]=seeds[k]||[]).push(t);};
+  for(let w=1;w<=SEM.weeks;w++)(SEM.weekly||[]).forEach((r)=>{
+    if(!KINDS.includes(r.kind)||w<(r.from||1)||w>(r.to||SEM.weeks)||(r.except||[]).includes(w))return;
+    let label=r.label||'';if(r.weekLabel)label=String(w);
+    if(r.labels){if(r.labels[w]!==undefined)label=r.labels[w];else if(r.skipUnlabelled)return;}
+    const d=addDays(monday(w),r.day);
+    add(d,{course:r.course,kind:r.kind,label,time:r.time||'',done:false,due:r.due?iso(r.dueDay!==undefined?addDays(monday(w),r.dueDay):d)+'T'+r.due:''});
+  });
+  (SEM.oneoffs||[]).forEach((o)=>{
+    if(!KINDS.includes(o.kind))return;
+    const d=addDays(base(o.week),o.day);
+    add(d,{course:o.course,kind:o.kind,label:o.label||'',time:o.time||'',done:false,due:o.due?iso(o.dueWeek!==undefined?addDays(base(o.dueWeek),o.dueDay):d)+'T'+o.due:''});
+  });
+  const days=(state&&state.days)||{};
+  const out=[];
+  const keys=new Set([...Object.keys(seeds),...Object.keys(days)]);
+  keys.forEach((k)=>{
+    const tasks=days[k]?(days[k].tasks||[]):(seeds[k]||[]);
+    tasks.forEach((t)=>{
+      if(!KINDS.includes(t.kind))return;
+      const c=(SEM.courses||{})[t.course];if(!c)return;
+      out.push({unit:c.name,kind:t.kind,label:t.label||'',time:t.time||'',done:!!t.done,due:t.due||(k+'T23:59')});
+    });
+  });
+  return out.sort((x,y)=>x.due<y.due?-1:1);
+}
+let DUE=[];
+async function sendDue(a){
+  const W=WIN[a.id];if(!W||!W.ready)return;
+  const tt=APPS.find(x=>x.kind==='tt');if(!tt)return;
+  try{const html=(await cached(tt.file)||{}).text;if(!html)return;
+    DUE=ttAssessments(html,stateOf(tt.id));post(W,{type:'ss-due',items:DUE});}
+  catch(e){console.error('shell: could not read the timetable',e);}
+}
+async function sendLogs(a){
+  const W=WIN[a.id];if(!W||!W.ready||!W.logFiles)return;
+  const logs={};
+  for(const p of W.logFiles){try{const e=await cached(p)||(GK?await getFile(p):null);if(e&&e.text!=null)logs[p]=e.text;}catch(e){}}
+  post(W,{type:'ss-logs',logs});
+}
+async function appendLog(a,file,entry){
+  /* the gatekeeper allows notes/<UNIT>/<UNIT> error log.md only; the shell keeps a local copy current so the app re-learns at once */
+  if(!/^notes\/([^/]+)\/\1 error log\.md$/.test(file)){toast('That is not an error log the phone may write');return;}
+  LOGQ.push({file,entry});await DB.put('kv','logs',LOGQ);
+  const c=await cached(file);
+  if(c&&c.text!=null)await remember(Object.assign({},c,{text:c.text.replace(/\s*$/,'')+'\n\n'+entry+'\n'}));
+  sendLogs(a);syncLine();flushLogs();
+}
+const IMG_EXT={png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',gif:'image/gif',webp:'image/webp',svg:'image/svg+xml'};
+async function dataUrl(path){
+  const ext=(path.split('.').pop()||'').toLowerCase(),mime=IMG_EXT[ext];if(!mime)return null;
+  const e=await getFile(path);
+  if(e.buf)return'data:'+mime+';base64,'+bytesToB64(e.buf);
+  if(e.text!=null)return'data:'+mime+';base64,'+btoa(unescape(encodeURIComponent(e.text)));
+  return null;
+}
+async function sendFig(a,path){
+  const W=WIN[a.id];if(!W)return;let src=null;
+  try{src=await dataUrl(path);}catch(e){console.error('shell: figure failed',e);}
+  post(W,{type:'ss-fig',path,src});
+}
+/* PGlite (about 17 MB): fetched once, kept in IndexedDB, copied out on each request so the cache stays whole */
+async function sendPg(a){
+  const W=WIN[a.id];if(!W)return;
+  try{
+    const ps=pgPaths(a);
+    const es=[];for(const p of ps)es.push(await getFile(p));
+    const [bundle,wasm,data,initdb]=[es[0].text,es[1].buf.slice(0),es[2].buf.slice(0),es[3].buf.slice(0)];
+    post(W,{type:'ss-pg',bundle,wasm,data,initdb},[wasm,data,initdb]);
+  }catch(e){
+    console.warn('shell: PGlite unavailable',e);
+    post(W,{type:'ss-pg',error:e instanceof NetError?'The PostgreSQL engine has not been downloaded to this phone yet; it needs a connection the first time.':'PGlite files are missing: '+(e.message||e)});
+  }
+}
+async function prefetchPg(){
+  const a=APPS.find(x=>x.kind==='ss');if(!a||!GK||!navigator.onLine)return;
+  try{const miss=[];for(const p of pgPaths(a))if(!(await DB.get('files',p)))miss.push(p);if(miss.length)await fetchFiles(miss);}
+  catch(e){console.warn('shell: PGlite prefetch stopped',e);}
+}
+
+/* ══ Markdown: Obsidian's syntax on top of marked (wikilinks, embeds, callouts, highlights, maths kept for KaTeX) ══ */
+/* Lessons read note SECTIONS: the study-space plugin's sliceSection(), verbatim. */
+function sliceSection(md,heading,until){
+  const norm=x=>String(x||'').replace(/[*_`~]/g,'').replace(/\s+#*\s*$/,'').trim().toLowerCase().replace(/\s+/g,' ');
+  const lines=String(md||'').split('\n'),H=/^(#{1,6})\s+(.*)$/;
+  let fence=false,start=-1,level=0,end=lines.length;
+  for(let i=0;i<lines.length;i++){
+    const ln=lines[i];
+    if(/^\s*(```|~~~)/.test(ln)){fence=!fence;continue;}
+    if(fence)continue;
+    const m=H.exec(ln);if(!m)continue;
+    if(start<0){if(norm(m[2])===norm(heading)){start=i;level=m[1].length;}continue;}
+    if(m[1].length<=level||(until&&norm(m[2])===norm(until))){end=i;break;}
+  }
+  return start<0?null:lines.slice(start,end).join('\n').trim();
+}
+const normHead=x=>String(x||'').replace(/[*_`~]/g,'').replace(/\s+#*\s*$/,'').trim().toLowerCase().replace(/\s+/g,' ');
+function mdToDom(md){
+  md=String(md||'').replace(/^﻿?---\r?\n[\s\S]*?\r?\n---[ \t]*(\r?\n|$)/,'');
+  const pre=[],post=[];
+  const holdPre=s=>{pre.push(s);return''+(pre.length-1)+'';};
+  const holdPost=s=>{post.push(s);return''+(post.length-1)+'';};
+  md=md.replace(/^([ \t]*)(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*$/gm,holdPre);    /* fenced code */
+  md=md.replace(/(`+)([^`\n]|[^`\n][\s\S]*?[^`\n])\1(?!`)/g,holdPre);                       /* inline code */
+  md=md.replace(/%%[\s\S]*?%%/g,'');                                                         /* comments */
+  md=md.replace(/[ \t]\^[A-Za-z0-9-]+[ \t]*$/gm,'');                                         /* block ids */
+  md=md.replace(/\$\$[\s\S]+?\$\$/g,m=>holdPost(esc(m)));                                    /* maths stays raw for KaTeX */
+  md=md.replace(/\$(?=[^\s$])([^$\n]*?[^\s$\\])\$(?!\d)/g,m=>holdPost(esc(m)));
+  md=md.replace(/\$([^\s$])\$/g,m=>holdPost(esc(m)));
+  md=md.replace(/!\[\[([^\]\n]+)\]\]/g,(m,t)=>holdPost(`<span class="emb" data-src="${esc(t)}"></span>`));
+  md=md.replace(/\[\[([^\]\n]+)\]\]/g,(m,t)=>{const [lp,al]=t.split('|');const shown=al||lp.replace(/#\^?/,' › ').replace(/^ › /,'');
+    return holdPost(`<a class="internal-link" data-href="${esc(lp.trim())}" href="#">${esc(shown.trim())}</a>`);});
+  md=md.replace(/==([^=\n](?:[^\n]*?[^=\n])?)==/g,'<mark>$1</mark>');
+  md=md.replace(/(\d+)/g,(m,i)=>pre[+i]);
+  let html=window.marked?window.marked.parse(md,{gfm:true,breaks:true}):'<pre>'+esc(md)+'</pre>';
+  html=html.replace(/(\d+)/g,(m,i)=>post[+i]);
+  /* sanitise: the notes are Jaden's own, but nothing inside one should run in the shell */
+  const doc=new DOMParser().parseFromString('<!doctype html><body>'+html,'text/html'),body=doc.body;
+  body.querySelectorAll('script,iframe,object,embed,style,link,meta,base,form,frame,frameset').forEach(n=>n.remove());
+  body.querySelectorAll('*').forEach(el=>[...el.attributes].forEach(at=>{const n=at.name.toLowerCase();
+    if(n.startsWith('on')||((n==='href'||n==='src'||n==='xlink:href'||n==='action'||n==='formaction')&&/^\s*(javascript|vbscript|data:(?!image\/))/i.test(at.value)))el.removeAttribute(at.name);}));
+  /* callouts: > [!type]± Title */
+  body.querySelectorAll('blockquote').forEach(bq=>{
+    const p=bq.firstElementChild;if(!p||p.tagName!=='P')return;
+    const m=/^\s*\[!([\w-]+)\]([+-]?)[ \t]*([^\n<]*?)\s*(<br>|$)/.exec(p.innerHTML.replace(/\n/g,''));if(!m)return;
+    /* foldable callouts (+ open, - folded, as Obsidian draws them) become a disclosure */
+    const fold=m[2]==='-'||m[2]==='+';
+    const div=doc.createElement(fold?'details':'div');div.className='callout';div.dataset.type=m[1].toLowerCase();if(m[2]==='+')div.open=true;
+    const t=doc.createElement(fold?'summary':'p');t.className='ct';t.innerHTML=m[3]||esc(m[1][0].toUpperCase()+m[1].slice(1).toLowerCase());
+    div.appendChild(t);
+    const rest=p.innerHTML.replace(/\n/g,'').slice(m[0].length);
+    if(rest.trim()){const q=doc.createElement('p');q.innerHTML=rest;div.appendChild(q);}
+    p.remove();while(bq.firstChild)div.appendChild(bq.firstChild);bq.replaceWith(div);
+  });
+  body.querySelectorAll('table').forEach(t=>{const w=doc.createElement('div');w.className='tw';t.replaceWith(w);w.appendChild(t);});
+  return body;
+}
+/* Obsidian's getFirstLinkpathDest(), over the gatekeeper's list of note/topic/attachment/GoodNotes paths */
+async function ensureIndex(force){
+  if(INDEX&&!force)return INDEX;
+  if(!force){const c=await DB.get('kv','index');if(c){INDEX=c;return INDEX;}}
+  try{const r=await api('index');INDEX=r.files.map(f=>f[0]);await DB.put('kv','index',INDEX);INDEX.at=Date.now();}catch(e){INDEX=INDEX||[];}
+  return INDEX;
+}
+async function resolveLink(lp,from){
+  lp=String(lp||'').trim().replace(/^\/+/,'');if(!lp)return from||null;
+  for(const force of[false,true]){
+    const L=await ensureIndex(force),low=lp.toLowerCase();
+    const exact=L.find(p=>p===lp||p===lp+'.md');if(exact)return exact;
+    let hits;
+    if(lp.includes('/'))hits=L.filter(p=>{const q=p.toLowerCase();return q.endsWith('/'+low)||q.endsWith('/'+low+'.md');});
+    else hits=L.filter(p=>{const n=p.split('/').pop().toLowerCase();return n===low||n===low+'.md';});
+    if(hits.length){const dir=from?from.split('/').slice(0,-1).join('/'):'';return hits.find(p=>p.startsWith(dir+'/'))||hits[0];}
+    if(force||!GK||!navigator.onLine)break;
+  }
+  return null;
+}
+/* Lessons: a note section rendered here and pushed as HTML, shaped exactly as the plugin shapes it */
+async function sendSlice(a,d){
+  const W=WIN[a.id];if(!W)return;
+  const reply=o=>post(W,Object.assign({type:'ss-slice',key:d.key},o));
+  try{
+    const path=/\.md$/i.test(d.note)?d.note:d.note+'.md';
+    let md;try{md=await getText(path);}catch(e){return reply({ok:false,why:(e instanceof NetError?'offline: ':'note missing: ')+path});}
+    const sec=sliceSection(md,d.heading,d.until);
+    if(sec==null)return reply({ok:false,why:'heading missing: '+d.heading});
+    const body=mdToDom(sec);
+    for(const span of[...body.querySelectorAll('span.emb')]){
+      const src=(span.dataset.src||'').split('|')[0].split('#')[0];
+      const tp=await resolveLink(src,path);let url=null;try{url=tp?await dataUrl(tp):null;}catch(e){}
+      if(url){const img=body.ownerDocument.createElement('img');img.src=url;img.alt=tp.split('/').pop();span.replaceWith(img);}else span.remove();
+    }
+    for(const el of[...body.querySelectorAll('a.internal-link')]){
+      const href=el.getAttribute('data-href')||'',[lp,sub]=href.split('#');
+      const tp=lp?await resolveLink(lp,path):path;
+      el.setAttribute('data-path',(tp||lp)+(sub?'#'+sub:''));el.setAttribute('href','#');el.removeAttribute('data-href');
+    }
+    body.querySelectorAll('a[href^="http"]').forEach(x=>{x.setAttribute('target','_blank');x.setAttribute('rel','noopener');});
+    body.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h=>{const n=body.ownerDocument.createElement('h4');n.innerHTML=h.innerHTML;h.replaceWith(n);});
+    body.querySelectorAll('[dir]').forEach(x=>x.removeAttribute('dir'));
+    reply({ok:true,html:body.innerHTML});
+  }catch(e){console.error('shell: slice failed',e);reply({ok:false,why:String(e&&e.message||e)});}
+}
+
+/* ══ the reading sheet ══ */
+const SH={hist:[],urls:[]};
+let lastFocus=null;
+function sheetOpen(title,sub){
+  const s=$('#sheet');
+  $('#sh-t').innerHTML=esc(title)+(sub?`<small>${esc(sub)}</small>`:'');
+  if(!s.classList.contains('open')){lastFocus=document.activeElement;s.classList.add('open');s.setAttribute('aria-hidden','false');$('#grab').style.visibility='hidden';}
+  $('#sh-back').hidden=SH.hist.length<2;
+  setTimeout(()=>$('#sh-b').focus({preventScroll:true}),RM.matches?0:60);
+}
+function sheetClose(){
+  const s=$('#sheet');if(!s.classList.contains('open'))return;
+  s.classList.remove('open');s.setAttribute('aria-hidden','true');$('#grab').style.visibility='';
+  SH.hist=[];setTimeout(()=>{if(!s.classList.contains('open')){$('#sh-b').innerHTML='';SH.urls.forEach(u=>URL.revokeObjectURL(u));SH.urls=[];}},500);
+  const W=mode==='app'&&WIN[APPS[idx]&&APPS[idx].id];
+  if(W)try{W.f.focus();}catch(e){}else if(lastFocus&&lastFocus.focus)lastFocus.focus();
+}
+$('#sh-x').addEventListener('click',sheetClose);
+$('#sh-back').addEventListener('click',()=>{SH.hist.pop();const prev=SH.hist.pop();if(prev)prev();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#sheet').classList.contains('open'))sheetClose();});
+/* drag the sheet's header down to put it away */
+(function(){
+  const hd=$('#sheet>header'),s=$('#sheet');let st=null;
+  hd.addEventListener('pointerdown',e=>{if(e.target.closest('button'))return;st={y:e.clientY,dy:0};hd.setPointerCapture(e.pointerId);s.style.transition='none';});
+  hd.addEventListener('pointermove',e=>{if(!st)return;st.dy=Math.max(0,e.clientY-st.y);if(!RM.matches)s.style.transform=`translateY(${st.dy}px)`;});
+  const up=()=>{if(!st)return;const dy=st.dy;st=null;s.style.transition='';s.style.transform='';if(dy>innerHeight*.18)sheetClose();};
+  hd.addEventListener('pointerup',up);hd.addEventListener('pointercancel',up);
+})();
+function sheetBody(html){const b=$('#sh-b');b.innerHTML=html;b.scrollTop=0;return b;}
+/* a note, read-only: frontmatter dropped, wikilinks walk to other notes inside the sheet, images come from attachments/ */
+async function showNote(path,sub,{fromHist=false}={}){
+  const name=path.split('/').pop().replace(/\.md$/i,''),unit=path.split('/')[1]||'';
+  if(!fromHist)SH.hist.push(()=>showNote(path,sub,{fromHist:true}));
+  sheetOpen(name,path.startsWith('notes/')||path.startsWith('topics/')?unit:'');
+  sheetBody('<div class="md"><p class="missing">Opening the note</p></div>');
+  let md;
+  try{md=await getText(path);}
+  catch(e){sheetBody(`<div class="md"><p>${e instanceof NetError?'This note has not been opened on the phone before, and there is no connection to fetch it.':'Could not read '+esc(path)+'.'}</p></div>`);return;}
+  const body=mdToDom(md),box=document.createElement('div');box.className='md';
+  while(body.firstChild)box.appendChild(document.adoptNode(body.firstChild));
+  const b=sheetBody('');b.appendChild(box);
+  box.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h=>h.dataset.h=normHead(h.textContent));
+  box.querySelectorAll('a[href^="http"]').forEach(x=>{x.target='_blank';x.rel='noopener';});
+  box.querySelectorAll('a.internal-link').forEach(x=>x.addEventListener('click',ev=>{ev.preventDefault();openPath(x.getAttribute('data-href'),path);}));
+  if(sub)scrollToHeading(box,sub);
+  for(const span of[...box.querySelectorAll('span.emb')]){
+    const src=(span.dataset.src||'').split('|')[0];const [lp]=src.split('#');
+    const tp=await resolveLink(lp,path);
+    if(tp&&IMG_EXT[(tp.split('.').pop()||'').toLowerCase()]){
+      try{const e=await getFile(tp);const u=URL.createObjectURL(new Blob([e.buf||e.text],{type:IMG_EXT[tp.split('.').pop().toLowerCase()]}));SH.urls.push(u);
+        const img=document.createElement('img');img.src=u;img.alt=tp.split('/').pop().replace(/\.\w+$/,'');img.loading='lazy';span.replaceWith(img);}
+      catch(e){span.outerHTML=`<span class="missing">${esc(lp)} (not on this phone yet)</span>`;}
+    }else if(tp){const a=document.createElement('a');a.href='#';a.textContent=tp.split('/').pop().replace(/\.md$/i,'');a.className='internal-link';
+      a.addEventListener('click',ev=>{ev.preventDefault();openPath(src,path);});span.replaceWith(a);}
+    else span.outerHTML=`<span class="missing">${esc(lp)}</span>`;
+  }
+  if(sub)scrollToHeading(box,sub);
+  if(box.querySelector('.katex-src')||/\$/.test(md))renderMath(box);
+}
+function scrollToHeading(box,sub){
+  const want=normHead(String(sub).replace(/^#/,'').split('#').pop());
+  const h=[...box.querySelectorAll('[data-h]')].find(x=>x.dataset.h===want);
+  if(h)h.scrollIntoView({block:'start'});
+}
+/* maths in notes: the Study Space's own vendored KaTeX, loaded into the shell once, only when a note has any */
+async function renderMath(el){
+  try{
+    if(!window.renderMathInElement){
+      const a=APPS.find(x=>x.kind==='ss');if(!a)return;const d=ssDir(a)+'/vendor/katex/';
+      const [css,js,ar]=await Promise.all([getText(d+'katex-embedded.css'),getText(d+'katex.min.js'),getText(d+'auto-render.min.js')]);
+      const st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+      for(const src of[js,ar]){const s=document.createElement('script');s.textContent=src;document.head.appendChild(s);}
+    }
+    window.renderMathInElement&&window.renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});
+  }catch(e){}
+}
+/* a GoodNotes PDF stays in Drive: the sheet offers a real tap to open it there (iOS only opens a new page from a tap) */
+async function showPdf(path,notePath,title,sub){
+  SH.hist.push(()=>showPdf(path,notePath,title,sub));
+  sheetOpen(title||path.split('/').pop().replace(/\.pdf$/i,''),sub||'Annotated slides');
+  sheetBody(`<p class="sheet-lead">Opening the link</p>`);
+  let link=null,err='';
+  try{const c=await cached(path);if(c&&c.link)link=c.link;else{const r=await api('read',{path});link=r.link;await remember({path,modified:r.modified,mime:r.mime,link});}}
+  catch(e){err=e instanceof NetError?'There is no connection, so the PDF cannot be opened right now.':'Could not find this PDF in Drive.';}
+  const page=(path.match(/#page=(\d+)/)||[])[1];
+  sheetBody(`<p class="sheet-lead">${link?`Your annotated slides open in Google Drive${page?`. Go to page ${esc(page)}`:''}.`:esc(err)}</p>
+    <div class="acts">${link?`<a class="btn mark" href="${esc(link)}" target="_blank" rel="noopener">${svg('ext')}Open in Google Drive</a>`:''}
+    ${notePath?`<button class="btn quiet" type="button" id="sh-note">${svg('note')}Read the written note</button>`:''}</div>`);
+  const nb=$('#sh-note');if(nb)nb.addEventListener('click',()=>showNote(notePath));
+}
+async function showImage(path){
+  SH.hist.push(()=>showImage(path));
+  sheetOpen(path.split('/').pop(),'Attachment');
+  try{const e=await getFile(path);const u=URL.createObjectURL(new Blob([e.buf||e.text],{type:IMG_EXT[path.split('.').pop().toLowerCase()]||'image/png'}));SH.urls.push(u);
+    sheetBody(`<div class="md"><img src="${u}" alt=""></div>`);}
+  catch(e){sheetBody('<p class="sheet-lead">This image is not on the phone yet.</p>');}
+}
+/* ss-open / wikilinks: the plugin's openPath(), on a phone: a note opens in the sheet, a PDF offers Drive */
+async function openPath(raw,from){
+  const s=String(raw||''),h=s.indexOf('#'),lp=h<0?s:s.slice(0,h),sub=h<0?'':s.slice(h+1);
+  const tp=await resolveLink(lp,from);
+  if(!tp){toast(`Couldn't find ${lp.split('/').pop()||'that note'} in the vault`);return;}
+  if(/\.pdf$/i.test(tp))return showPdf(tp+(sub?'#'+sub:''),null);
+  if(/\.md$/i.test(tp))return showNote(tp,sub);
+  if(IMG_EXT[(tp.split('.').pop()||'').toLowerCase()])return showImage(tp);
+  toast('That file does not open on the phone');
+}
+/* tt-open-note: the timetable plugin's lectureEntry() — the week's GoodNotes PDF wins over the written note */
+async function openLectureNote(unit,week){
+  const notes=NOTES||[];const hits=notes.filter(n=>n.unit===unit&&n.week===Number(week));
+  const hit=hits.find(n=>n.pdf)||hits[0];
+  if(!hit){toast(`No note or GoodNotes PDF yet for ${unit} wk ${week}`);return;}
+  SH.hist=[];
+  if(hit.pdf)return showPdf(hit.pdf,hit.path,`${unit} · week ${week}`,'Annotated slides');
+  return showNote(hit.path);
+}
+
+/* ══ glances: read from each live app's own engine, cached for an instant cold start ══ */
+const GL={};
+function wantGlance(id,delay=0){const W=WIN[id];if(!W)return;clearTimeout(W.gt);W.gt=setTimeout(()=>{if(W.ready)post(W,{type:'shell-glance?'});},delay);}
+function gotGlance(a,m){if(!m||m.error){if(m&&m.error)console.warn('shell: glance',a.id,m.error);return;}GL[a.id]=m;DB.put('kv','glance:'+a.id,m);if(mode==='stack')renderLabels();else renderHead();}
+function fmtCountdown(ms){const past=ms<0;ms=Math.abs(ms);const d=Math.floor(ms/MS_DAY),h=Math.floor(ms%MS_DAY/36e5),m=Math.floor(ms%36e5/6e4);
+  const s=d>0?`${d}d ${h}h`:h>0?`${h}h ${m}m`:`${m}m`;return past?`${s} over`:`in ${s}`;}
+const dueCls=diff=>diff<0?'over':diff<24*36e5?'urgent':diff<72*36e5?'soon':'mut';
+const colOf=(m)=>isDark()?(m.dark||m.light):(m.light||m.dark);
+function line(a){
+  const m=GL[a.id];if(!m)return'';
+  if(a.glance==='tt'){
+    if(m.today!==isoOf(new Date()))return'';
+    const first=m.left?`${m.left} left today`:m.total?'All done today':'Nothing on today';
+    let s=`<span class="g num"><b>${first}</b>${m.over?` · <span class="over">${m.over} overdue</span>`:''}</span>`;
+    const n=m.next;if(n){const diff=n.due-Date.now();
+      s+=`<span class="g num"><span class="cw" style="--c:${esc(colOf(n)||'currentColor')}">${esc(n.short)}</span> ${esc(n.label)} <span class="${dueCls(diff)}">${fmtCountdown(diff)}</span></span>`;}
+    return s;
+  }
+  if(a.glance==='ss')return(m.subs||[]).slice(0,2).map(s=>`<span class="g num"><i class="dot" style="--c:${esc(colOf(s)||'currentColor')}"></i> ${esc(s.title)} <span class="${s.due?'':'mut'}">${s.due?s.due+' to drill':'none due'}</span></span>`).join('');
+  return'';
+}
+function renderHead(){
+  const now=new Date();$('#date').textContent=`${DAYL[(now.getDay()+6)%7]} ${now.getDate()} ${MONL[now.getMonth()]}`;
+  const t=APPS.find(a=>a.glance==='tt'),m=t&&GL[t.id];
+  $('#wk').textContent=m&&m.today===isoOf(now)?(m.week?`Week ${m.week} / ${m.weeks}`:(m.tag||'')):'';
+}
+
+/* ══ live app windows ══ */
+function ensureWin(a){
+  if(WIN[a.id])return WIN[a.id];
+  const el=document.createElement('div');el.className='win';el.dataset.app=a.id;
+  const f=document.createElement('iframe');f.title=a.name;f.setAttribute('sandbox','allow-scripts allow-modals');
+  const wait=document.createElement('div');wait.className='wait';
+  el.append(f,wait);$('#wins').appendChild(el);
+  const W=WIN[a.id]={el,f,wait,app:a,ready:false};
+  paintWin(W);waitMsg(W,'Opening from your vault');
+  f.addEventListener('load',()=>{if(!f.srcdoc)return;wait.hidden=true;pushInsets(a);});
+  return W;
+}
+function paintWin(W){const L=look(W.app);W.el.style.setProperty('--wp',L.paper);W.el.style.setProperty('--wm',L.muted);W.el.style.setProperty('--wi',L.ink);W.el.style.setProperty('--wl',L.line||L.muted);}
+function waitMsg(W,msg,retry){
+  W.wait.hidden=false;W.wait.innerHTML=`<b>${esc(W.app.name)}</b><span>${esc(msg)}</span>${retry?'<button type="button">Try again</button>':''}`;
+  if(retry)W.wait.querySelector('button').addEventListener('click',e=>{e.stopPropagation();loadApp(W.app,{force:true});});
+}
+function pushInsets(a){const W=WIN[a.id];if(W&&W.f.srcdoc)post(W,Object.assign({type:'shell-insets'},appInsets()));}
+async function loadApp(a,{force=false}={}){
+  const W=ensureWin(a);
+  try{
+    const paths=await codePaths(a),miss=[];
+    for(const p of paths)if(force||!(await cached(p)))miss.push(p);
+    if(miss.length){waitMsg(W,'Fetching from your vault');await fetchFiles(miss);}
+    if(a.kind==='ss'){const again=await codePaths(a);const more=[];for(const p of again)if(!(await cached(p)))more.push(p);if(more.length)await fetchFiles(more);}
+    await loadState(a);
+    W.ready=false;W.stale=false;W.f.srcdoc=await assemble(a);
+  }catch(e){
+    console.warn('shell: could not open',a.id,e);
+    waitMsg(W,e instanceof NetError?'Not on this phone yet, and there is no connection.':'Could not load it: '+(e.message||e),true);
+  }
+}
+async function loadState(a){
+  if(!a.state)return;
+  const s=SYNC[a.id]=SYNC[a.id]||{};
+  let e=await cached(a.state);
+  if(!e&&GK)e=(await fetchFiles([a.state]))[a.state];   /* a NetError here stops the app opening: it must never start blank */
+  if(e&&e.text!=null&&!s.base){try{s.base=JSON.parse(e.text);s.baseMod=e.modified;}catch(err){}}
+  if(!s.base&&!(e&&e.error&&/^missing/.test(e.error)))throw new GateError('could not read '+a.state);
+  if(s.local===undefined)s.local=(await DB.get('kv','local:'+a.id))||null;
+  if(s.local)setTimeout(()=>flush(a.id),1500);
+}
+/* the app's code changed in the vault (a new semester, a new bank): reload it, but never under his fingers */
+function reloadSoon(a){const W=WIN[a.id];if(!W)return;if(mode==='app'&&APPS[idx]===a){W.stale=true;return;}loadApp(a);}
+
+/* ══ keeping current: one cheap stat call for every file in play, then fetch only what moved ══ */
+let revalT=0,lastNotes=0;
+async function revalidate(){
+  if(!GK||revalidate.busy)return;revalidate.busy=true;
+  try{
+    const codeBy={};for(const a of APPS)codeBy[a.id]=await codePaths(a,{fetchMissing:false});
+    const logs=[...new Set(Object.values(WIN).flatMap(w=>w.logFiles||[]))];
+    const paths=[...new Set([...Object.values(codeBy).flat(),...APPS.map(a=>a.state).filter(Boolean),...logs])];
+    const r=await api('stat',{paths});
+    const changed=[];
+    for(const p of paths){const m=r.modified[p];if(!m)continue;const c=await cached(p);if(!c||c.modified!==m)changed.push(p);}
+    for(const a of APPS){
+      if(a.state&&changed.includes(a.state)){
+        const s=SYNC[a.id];if(!s)continue;
+        if(s.local)flush(a.id);          /* the save merges the server's version and pushes the union back */
+        else{const f=(await fetchFiles([a.state]))[a.state];if(f&&f.text!=null){try{const st=JSON.parse(f.text);s.base=st;s.baseMod=f.modified;
+          if(canon(st)!==s.appCanon)pushState(a,st);}catch(e){}}}
+      }
+    }
+    const code=changed.filter(p=>!APPS.some(a=>a.state===p)&&!logs.includes(p));
+    if(code.length){
+      await fetchFiles(code);
+      for(const a of APPS){if(code.some(p=>codeBy[a.id].includes(p))){reloadSoon(a);}}
+      if(APPS.some(a=>a.kind==='tt'&&code.includes(a.file)))APPS.filter(b=>b.kind==='ss').forEach(b=>sendDue(b));
+    }
+    const lchanged=logs.filter(p=>changed.includes(p));
+    if(lchanged.length){await fetchFiles(lchanged);APPS.filter(b=>b.kind==='ss').forEach(b=>sendLogs(b));}
+    if(Date.now()-lastNotes>3*60e3)await refreshNotes();
+    if(!INDEX||!INDEX.at||Date.now()-INDEX.at>15*60e3)ensureIndex(true);
+    if(!lastSync)lastSync=Date.now();
+    flushLogs();Object.keys(SYNC).forEach(id=>SYNC[id].local&&flush(id));
+  }catch(e){if(!(e instanceof NetError))console.warn('shell: revalidate',e);}
+  finally{revalidate.busy=false;syncLine();}
+}
+async function refreshNotes(){
+  try{const r=await api('notes');lastNotes=Date.now();
+    if(canon(r.notes)!==canon(NOTES)){NOTES=r.notes;await DB.put('kv','notes',NOTES);
+      APPS.filter(a=>a.kind==='tt').forEach(a=>{const W=WIN[a.id];if(W&&W.ready)post(W,{type:'tt-notes',notes:NOTES});});}}
+  catch(e){if(!(e instanceof NetError))console.warn('shell: notes',e);}
+}
+function schedule(){clearTimeout(revalT);if(document.visibilityState==='visible')revalT=setTimeout(()=>{revalidate();schedule();},90e3);}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'){revalidate();schedule();renderHead();if(mode==='stack')renderLabels();Object.keys(WIN).forEach(id=>wantGlance(id,300));}
+  else Object.keys(SYNC).forEach(id=>{const s=SYNC[id];if(s.local){clearTimeout(s.t);flush(id);}});
+});
+addEventListener('online',()=>{NET.down=false;syncLine();revalidate();});
+addEventListener('offline',syncLine);
+
+/* ══ home: the card stack (ported from the approved home-final mock) ══ */
+const SHELL={};
+let mode='stack',idx=0;
+const LAB_H=96,STATUS_H=46;
+function geo(){
+  const W=innerWidth,H=innerHeight,ins=insets(),hb=$('#hd').getBoundingClientRect().bottom;
+  const top=hb+18,avail=H-top-LAB_H-Math.max(ins.b,6)-STATUS_H;
+  const s=Math.max(.25,Math.min(avail/H,(W-128)/W)),cw=W*s,ch=H*s,gap=Math.max(14,W*.04);
+  return{W,H,s,cw,ch,top,gap,x0:(W-cw)/2};
+}
+const cardX=(i,g,drag)=>g.x0+(i-idx)*(g.cw+g.gap)+(drag||0);
+function place(drag){
+  const g=geo();
+  APPS.forEach((a,i)=>{
+    const W=WIN[a.id],L=$(`.lab[data-i="${i}"]`),x=cardX(i,g,drag);
+    if(W){if(mode==='app'&&i===idx){W.el.style.transform='translate(0px,0px) scale(1)';W.el.style.borderRadius='0px';}
+      else{W.el.style.transform=`translate(${x}px,${g.top}px) scale(${g.s})`;W.el.style.borderRadius=(22/g.s)+'px';}}
+    if(L){L.style.transform=`translate(${x}px,${g.top+g.ch+14}px)`;L.style.width=g.cw+'px';}
+  });
+}
+function renderLabels(){
+  renderHead();
+  const focused=document.activeElement&&document.activeElement.classList.contains('lab')?+document.activeElement.dataset.i:-1;
+  $('#labels').innerHTML=APPS.map((a,i)=>`<button class="lab" type="button" role="listitem" data-i="${i}" aria-label="Open ${esc(a.name)}"><span class="nm">${esc(a.name)}</span>${line(a)}</button>`).join('');
+  $$('.lab').forEach(b=>b.addEventListener('click',()=>openApp(+b.dataset.i)));
+  if(focused>=0){const b=$(`.lab[data-i="${focused}"]`);b&&b.focus({preventScroll:true});}
+  place();
+}
+function layoutGrab(){
+  const t=insets().t+grabBand(),h=Math.min(44,t),G=$('#grab');G.style.top=(t-h)+'px';G.style.height=h+'px';
+  if(APPS[idx])G.style.setProperty('--grab',look(APPS[idx]).muted);
+}
+SHELL.repaint=()=>{renderLabels();layoutGrab();if(mode==='app')document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);};
+
+/* ── the one authored transition: the card grows into the app, and the app shrinks back into its card ── */
+let settleT=0;
+function settle(fn){clearTimeout(settleT);settleT=setTimeout(fn,RM.matches?0:480);}
+function openApp(i){
+  if(i<0||i>=APPS.length)return;
+  idx=i;const a=APPS[i],W=ensureWin(a);W.el.classList.add('on');
+  document.body.classList.add('anim');document.body.classList.remove('stack');mode='app';
+  W.el.style.zIndex=30;APPS.forEach((b,j)=>{const w=WIN[b.id];if(w&&j!==i)w.el.style.zIndex=11;});
+  place();document.documentElement.style.setProperty('--clock',look(a).ink);layoutGrab();
+  settle(()=>{if(mode!=='app')return;APPS.forEach((b,j)=>{const w=WIN[b.id];if(w&&j!==idx)w.el.classList.remove('on');});
+    document.body.classList.remove('anim');try{W.f.focus();}catch(e){}});
+}
+function toStack(){
+  mode='stack';APPS.forEach(a=>{const w=ensureWin(a);w.el.classList.add('on');});
+  document.body.classList.add('anim','stack');document.documentElement.style.removeProperty('--clock');
+  renderLabels();APPS.forEach(a=>wantGlance(a.id,500));
+  settle(()=>{if(mode==='stack')document.body.classList.remove('anim');
+    APPS.forEach(a=>{const w=WIN[a.id];if(w&&w.stale)loadApp(a);});
+    const b=$(`.lab[data-i="${idx}"]`);if(b)b.focus({preventScroll:true});});
+}
+
+/* ── one shrink gesture, two ways in (pinch, grab bar): the same scale/position mapping and the same release rules ──
+   p runs 0 (app full screen) → 1 (sitting in its card). A flick decides on its own (down closes, back up reopens);
+   otherwise past 22% it settles into the stack and short of that it springs back open. Reduced motion: nothing follows
+   the finger, the release alone decides, and the switch is instant. */
+const SHRINK_AT=.22,FLICK=.0025;
+let gz=null;
+function shrinkStart(){
+  if(mode!=='app'||gz)return false;
+  const t=performance.now();gz={p:0,v:0,lt:t};document.body.classList.remove('anim');
+  APPS.forEach((a,i)=>{if(i===idx)return;const w=ensureWin(a);w.el.classList.add('on');});place();return true;
+}
+function shrinkTo(p){
+  if(!gz)return;p=Math.max(0,Math.min(1,p));
+  const t=performance.now(),dt=t-gz.lt;if(dt>0)gz.v=.6*gz.v+.4*((p-gz.p)/dt);gz.p=p;gz.lt=t;
+  if(RM.matches&&!gz.force)return;
+  const g=geo(),W=WIN[APPS[idx].id],s=1-p*(1-g.s),x=p*cardX(idx,g),y=p*g.top;
+  W.el.style.transform=`translate(${x}px,${y}px) scale(${s})`;W.el.style.borderRadius=(p*22/s)+'px';
+  /* the bar belongs to the app: it rides on the shrinking window's top edge */
+  $('#grab').style.transform=`translate(${x+g.W*s/2-g.W/2}px,${y}px)`;
+}
+function shrinkEnd(){
+  if(!gz)return;const{p}=gz,v=performance.now()-gz.lt>90?0:gz.v;gz=null;$('#grab').style.transform='';
+  const close=v>FLICK?p>.03:v<-FLICK?false:p>SHRINK_AT;
+  if(close){toStack();return;}
+  document.body.classList.add('anim');place();settle(()=>{if(mode!=='app')return;document.body.classList.remove('anim');
+    APPS.forEach((a,i)=>{const w=WIN[a.id];if(w&&i!==idx)w.el.classList.remove('on');});});
+}
+SHELL.pinch=(phase,r)=>{
+  if(phase==='start')shrinkStart();
+  else if(phase==='move')shrinkTo((1-(+r||1))/.45);
+  else if(phase==='end')shrinkEnd();
+};
+/* the grab bar: drag down only; a tap does nothing, so a stray touch never leaves the app */
+(function(){
+  const G=$('#grab');let st=null;
+  G.addEventListener('pointerdown',e=>{if(mode!=='app')return;st={y:e.clientY,on:false};G.setPointerCapture(e.pointerId);G.classList.add('held');document.body.classList.add('held');});
+  G.addEventListener('pointermove',e=>{if(!st)return;const dy=e.clientY-st.y;
+    if(!st.on&&dy>6)st.on=shrinkStart();
+    if(st.on)shrinkTo((dy-6)/(innerHeight*.34));});
+  const up=()=>{if(!st)return;const on=st.on;st=null;G.classList.remove('held');document.body.classList.remove('held');if(on)shrinkEnd();};
+  G.addEventListener('pointerup',up);G.addEventListener('pointercancel',up);
+  /* keyboard has no drag: Enter or Space on the focused bar goes back to the stack */
+  G.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&mode==='app'){e.preventDefault();toStack();}});
+})();
+/* trackpad pinch on a laptop arrives as ctrl+wheel; feed it to the same gesture */
+let wz=null;
+function wheelPinch(dy){
+  if(mode!=='app')return;
+  if(!wz){wz={acc:0};SHELL.pinch('start');}
+  wz.acc=Math.max(0,wz.acc+dy);SHELL.pinch('move',1-wz.acc/220);
+  clearTimeout(wz.t);wz.t=setTimeout(()=>{wz=null;SHELL.pinch('end');},160);
+}
+addEventListener('wheel',e=>{if(e.ctrlKey){e.preventDefault();if(mode==='app')wheelPinch(e.deltaY);}},{passive:false});
+['gesturestart','gesturechange'].forEach(t=>document.addEventListener(t,e=>e.preventDefault()));
+
+/* ── the deck: swipe sideways through the cards, tap one to step in ── */
+(function(){
+  const D=$('#deck');let st=null;
+  D.addEventListener('pointerdown',e=>{st={x:e.clientX,y:e.clientY,dx:0,h:false};D.setPointerCapture(e.pointerId);});
+  D.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y;
+    if(!st.h&&Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){st.h=true;document.body.classList.remove('anim');}
+    if(st.h){const edge=(idx===0&&dx>0)||(idx===APPS.length-1&&dx<0);st.dx=edge?dx*.3:dx;place(st.dx);}});
+  const up=e=>{if(!st)return;const s=st;st=null;const g=geo();
+    if(s.h){let n=idx;if(Math.abs(s.dx)>40)n=idx-Math.sign(s.dx)*Math.max(1,Math.round(Math.abs(s.dx)/(g.cw+g.gap)));
+      idx=Math.max(0,Math.min(APPS.length-1,n));document.body.classList.add('anim');place();settle(()=>mode==='stack'&&document.body.classList.remove('anim'));return;}
+    if(e.type!=='pointerup')return;
+    for(let i=0;i<APPS.length;i++){const x=cardX(i,g);if(e.clientX>=x&&e.clientX<=x+g.cw&&e.clientY>=g.top&&e.clientY<=g.top+g.ch+LAB_H){openApp(i);return;}}
+  };
+  D.addEventListener('pointerup',up);D.addEventListener('pointercancel',up);
+})();
+document.addEventListener('keydown',e=>{
+  if(mode!=='stack'||$('#sheet').classList.contains('open')||$('#setup').classList.contains('on'))return;
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){idx=Math.max(0,Math.min(APPS.length-1,idx+(e.key==='ArrowRight'?1:-1)));document.body.classList.add('anim');place();$(`.lab[data-i="${idx}"]`).focus({preventScroll:true});}
+});
+addEventListener('resize',()=>{place();layoutGrab();Object.values(WIN).forEach(w=>pushInsets(w.app));});
+MQ.addEventListener('change',()=>{if(TP)return;applyTheme();
+  Object.values(WIN).forEach(W=>{paintWin(W);if(W.ready)themeMsgs(W.app).forEach(m=>post(W,m));});SHELL.repaint();});
+setInterval(()=>{if(mode==='stack'&&document.visibilityState==='visible')renderLabels();},60e3);
+
+/* ══ setup & the connection sheet ══ */
+function showSetup(again){
+  const s=$('#setup');s.classList.add('on');s.classList.remove('busy');
+  $('#su-url').value=GK?GK.url:'';$('#su-key').value=GK?GK.key:'';$('#su-err').textContent='';
+  $('#su-cancel').hidden=!again;$('#su-go').disabled=false;$('#su-go').textContent='Connect';
+  setTimeout(()=>{(GK?$('#su-go'):$('#su-url')).focus();},50);
+}
+$('#su-cancel').addEventListener('click',()=>$('#setup').classList.remove('on'));
+$('#su-f').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const url=$('#su-url').value.trim(),key=$('#su-key').value.trim(),err=$('#su-err'),go=$('#su-go');
+  err.textContent='';
+  if(!/^https?:\/\/\S+$/.test(url)){err.textContent='That URL doesn\'t look right. It starts with https:// and ends in /exec.';$('#su-url').focus();return;}
+  if(!key){err.textContent='Paste the key too. setup() printed it in the script\'s execution log.';$('#su-key').focus();return;}
+  go.disabled=true;go.textContent='Connecting';
+  try{await api('ping',{},{cfg:{url,key},timeout:30000});}
+  catch(ex){go.disabled=false;go.textContent='Connect';
+    err.textContent=ex instanceof NetError?'Couldn\'t reach that URL. Check it\'s the web app URL ending in /exec and that you\'re online.'
+      :/bad key/.test(ex.message)?'The gatekeeper didn\'t accept that key. Copy it again from the execution log.':ex.message;return;}
+  const changed=!GK||GK.url!==url||GK.key!==key;
+  GK={url,key};localStorage.setItem(CFG_KEY,JSON.stringify(GK));
+  if(!booted){$('#setup').classList.add('busy');await firstFetch();}
+  else if(changed){revalidate();}
+  $('#setup').classList.remove('on','busy');syncLine();
+  if(!booted)start();
+});
+/* the first time: everything both apps need comes down once, then lives on the phone */
+async function firstFetch(){
+  const bar=$('#su-bar'),txt=$('#su-p');
+  try{
+    const all=[];for(const a of APPS){all.push(...await codePaths(a));if(a.state)all.push(a.state);}
+    const paths=[...new Set(all)];let n=0;
+    txt.textContent='Fetching your apps from Drive';
+    await fetchFiles(paths,()=>{n++;bar.style.transform=`scaleX(${n/paths.length})`;});
+    txt.textContent='Reading your note list';
+    await refreshNotes();
+  }catch(e){txt.textContent='Some files didn\'t come down. The phone will keep trying.';await sleep(1200);}
+}
+$('#status').addEventListener('click',()=>{
+  SH.hist=[];sheetOpen('Connection');
+  const n=pending(),host=GK?(()=>{try{return new URL(GK.url).host;}catch(e){return GK.url;}})():'not set';
+  sheetBody(`<p class="sheet-lead">${esc($('#status span').textContent)}.</p>
+  <div class="rowinfo"><div><span>Gatekeeper</span><span>${esc(host)}</span></div>
+  <div><span>Waiting to save</span><span class="num">${n?n+' change'+(n>1?'s':''):'nothing'}</span></div>
+  <div><span>Last synced</span><span class="num">${lastSync?clock(new Date(lastSync)):'not yet'}</span></div></div>
+  <div class="acts"><button class="btn quiet" type="button" id="cx-sync">Sync now</button>
+  <button class="btn quiet" type="button" id="cx-edit">Change the URL or key</button>
+  <button class="btn quiet" type="button" id="cx-reload">Reload both apps</button>
+  <button class="btn quiet danger" type="button" id="cx-forget">Forget this phone</button></div>`);
+  $('#cx-sync').addEventListener('click',async()=>{$('#cx-sync').textContent='Syncing';await revalidate();sheetClose();toast(NET.down?'No connection. Your changes stay on this phone.':'Synced');});
+  $('#cx-edit').addEventListener('click',()=>{sheetClose();showSetup(true);});
+  $('#cx-reload').addEventListener('click',()=>{sheetClose();APPS.forEach(a=>loadApp(a));});
+  $('#cx-forget').addEventListener('click',async()=>{
+    if(pending()&&!confirm('There are changes that haven\'t reached the vault yet. Forget this phone anyway? They will be lost.'))return;
+    if(!pending()&&!confirm('Forget the gatekeeper and clear everything cached on this phone?'))return;
+    localStorage.removeItem(CFG_KEY);await DB.clear('files');await DB.clear('kv');location.reload();});
+});
+
+/* ══ boot ══ */
+let booted=false;
+async function boot(){
+  try{await DB.open();}catch(e){console.warn('shell: no IndexedDB; nothing is kept offline',e);}
+  let reg=null;
+  try{reg=await(await fetch('apps.json',{cache:'no-cache'})).json();}catch(e){}
+  if(!reg)reg=await DB.get('kv','apps');else DB.put('kv','apps',reg);
+  APPS=(reg&&reg.apps)||[];
+  for(const a of APPS){const g=await DB.get('kv','glance:'+a.id);if(g)GL[a.id]=g;}
+  NOTES=(await DB.get('kv','notes'))||null;
+  LOGQ=(await DB.get('kv','logs'))||[];
+  const ix=await DB.get('kv','index');if(ix)INDEX=ix;
+  renderLabels();layoutGrab();syncLine();
+  if(!GK){showSetup(false);return;}
+  start();
+}
+function start(){
+  booted=true;
+  APPS.forEach(a=>{const w=ensureWin(a);w.el.classList.add('on');});
+  const o=P.get('open'),oi=APPS.findIndex(a=>a.id===o);
+  if(oi>=0)idx=oi;
+  renderLabels();
+  if(oi>=0){mode='app';document.body.classList.remove('stack');place();document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);
+    APPS.forEach((a,i)=>{if(i!==idx)WIN[a.id].el.classList.remove('on');});WIN[APPS[idx].id].el.style.zIndex=30;
+    /* screenshots only: &drag=0.4 freezes a grab-bar drag part-way */
+    const dp=parseFloat(P.get('drag'));if(dp>0){setTimeout(()=>{shrinkStart();gz.force=true;$('#grab').classList.add('held');shrinkTo(dp);},P.get('dragAt')?+P.get('dragAt'):2500);}}
+  layoutGrab();
+  Promise.all(APPS.map(a=>loadApp(a))).then(()=>{revalidate();schedule();setTimeout(prefetchPg,8000);});
+}
+boot();
+if('serviceWorker'in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(e=>console.warn('shell: no offline cache',e));
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "about": "The phone shell's app registry. One entry per study app; a new app is one more entry. kind picks the host protocol the shell speaks (tt = the study-timetable plugin's, ss = the study-space plugin's). file and state are vault paths the gatekeeper allows. glance picks the line under the card. look is the app's own paper, used for its card before it has loaded.",
+  "apps": [
+    {
+      "id": "tt",
+      "name": "Study plan",
+      "kind": "tt",
+      "file": "system/study_timetable.html",
+      "state": "system/timetable-state.json",
+      "glance": "tt",
+      "look": {
+        "light": { "paper": "#faf9f7", "line": "#e4e0d8", "ink": "#2b2723", "muted": "#6a635b" },
+        "dark":  { "paper": "#0c0c0c", "line": "#303030", "ink": "#e8e4dc", "muted": "#969696" }
+      }
+    },
+    {
+      "id": "ss",
+      "name": "Study Space",
+      "kind": "ss",
+      "file": "system/studyspace/studyspace.html",
+      "state": "system/studyspace/state.json",
+      "glance": "ss",
+      "look": {
+        "light": { "paper": "#e9edf4", "line": "#d3dae7", "ink": "#131a2a", "muted": "#55607a" },
+        "dark":  { "paper": "#0f1420", "line": "#2d3852", "ink": "#eaeef7", "muted": "#a3adc2" }
+      }
+    }
+  ]
+}
