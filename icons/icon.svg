@@ -1,10 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Study desk icon: one line of your notes, highlighted. Warm Paper, pencil rules, the highlighter for "now". -->
+  <!-- Study desk icon (Jaden picked "B", Oct 2026): a calendar page with today circled in the highlighter.
+       Warm Paper ground, Planner Violet header, pencil-grey days, highlighter yellow = now. -->
   <rect width="1024" height="1024" fill="#faf9f7"/>
-  <g stroke-linecap="round" fill="none">
-    <path d="M232 318H792" stroke="#cec8bc" stroke-width="44"/>
-    <path d="M232 706H640" stroke="#cec8bc" stroke-width="44"/>
+  <rect x="192" y="224" width="640" height="600" rx="68" fill="#ffffff" stroke="#cec8bc" stroke-width="20"/>
+  <path d="M192 292a68 68 0 0 1 68-68h504a68 68 0 0 1 68 68v84H192z" fill="#6d28d9"/>
+  <g fill="#cec8bc">
+    <circle cx="320" cy="500" r="32"/><circle cx="448" cy="500" r="32"/><circle cx="576" cy="500" r="32"/><circle cx="704" cy="500" r="32"/>
+    <circle cx="320" cy="636" r="32"/><circle cx="448" cy="636" r="32"/><circle cx="704" cy="636" r="32"/>
   </g>
-  <path d="M196 438 L842 418 L836 600 L190 620 Z" fill="#ffd447" stroke="#ffd447" stroke-width="22" stroke-linejoin="round"/>
-  <path d="M248 516H776" stroke="#2b2723" stroke-width="50" stroke-linecap="round"/>
+  <circle cx="576" cy="636" r="68" fill="#ffd447"/>
+  <circle cx="576" cy="636" r="24" fill="#1c1600"/>
 </svg>

@@ -3,9 +3,9 @@
    Drive's modified time, and the gatekeeper's calls always go straight to the network.
    index.html and apps.json are network-first (so a new upload reaches the phone on the next open, and offline falls
    back to the last copy); the rest of the shell answers from cache and refreshes behind; Google Fonts are kept once fetched. */
-const SHELL = 'study-shell-v11', FONTS = 'study-fonts-v1';   /* bump SHELL on every shell upload */
+const SHELL = 'study-shell-v12', FONTS = 'study-fonts-v1';   /* bump SHELL on every shell upload */
 const CORE = ['./', 'index.html', 'diag.html', 'apps.json', 'manifest.webmanifest', 'vendor/marked.min.js',
-  'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
+  'icons/icon-180.png?v=2', 'icons/icon-192.png?v=2', 'icons/icon-512.png?v=2'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
