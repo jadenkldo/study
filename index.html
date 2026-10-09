@@ -51,7 +51,9 @@ html.sim{--sat:59px;--sab:34px;}
 *{box-sizing:border-box;margin:0;padding:0;}
 [hidden]{display:none!important;}
 html,body{height:100%;}
-body{background:var(--bg);color:var(--text);font-family:var(--font-ui);font-size:15px;line-height:1.45;overflow:hidden;
+/* under everything: the open app's own paper, so no gap can ever show the shell's colour */
+html{background:var(--canvas,var(--bg));}
+body{background:transparent;color:var(--text);font-family:var(--font-ui);font-size:15px;line-height:1.45;overflow:hidden;
   -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit;-webkit-appearance:none;appearance:none;}
 a{color:inherit;}
@@ -69,7 +71,14 @@ h1,h2,h3,.serif{font-family:var(--font-display);font-weight:600;letter-spacing:-
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);flex:none;}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
 /* live app windows: kept alive once opened, so switching is instant and each app keeps its place */
-#wins{position:fixed;inset:0;pointer-events:none;z-index:10;}
+/* full-screen sizing: --fullh is the real screen height, set from script. iOS home-screen apps can report a layout
+   viewport shorter than the screen by the home-indicator band, so inset:0 / 100% / 100dvh would stop short of the bottom */
+#wins{position:fixed;left:0;top:0;width:100%;height:var(--fullh,100%);pointer-events:none;z-index:10;}
+/* the status cap: one solid band, the open app's own paper, across the status-bar zone. iOS draws its blurred
+   scroll-edge band over the top of a page whose top edge has no solid fixed element; this is that element.
+   No blur, no gradient, no transparency */
+#cap{position:fixed;left:0;right:0;top:0;height:var(--capH,0px);background:var(--capc,var(--bg));z-index:35;pointer-events:none;}
+#basecap{position:fixed;left:0;right:0;top:50%;height:calc(var(--fullh,100vh) + 200px);background:var(--basec,var(--bg));z-index:0;pointer-events:none;}
 .win{position:absolute;inset:0;visibility:hidden;pointer-events:none;overflow:hidden;background:var(--wp);}
 .win.on{visibility:visible;pointer-events:auto;}
 .win iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:var(--wp);}
@@ -99,7 +108,7 @@ body:not(.stack) #labels{opacity:0;transition:opacity .12s;}
 .lab .g{display:block;font-size:14px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .lab:focus-visible{outline:2px solid var(--text);outline-offset:4px;}
 body.anim .lab{transition:transform .46s var(--ease);}
-#deck{position:fixed;inset:0;z-index:20;display:none;touch-action:pan-y;}
+#deck{position:fixed;left:0;top:0;width:100%;height:var(--fullh,100%);z-index:20;display:none;touch-action:pan-y;}
 body.stack #deck{display:block;}
 /* the grab bar: a sheet handle under the Dynamic Island. The 44px hit zone lives in the safe-area band, above both apps'
    own top bars; only the 5px bar shows */
@@ -109,7 +118,7 @@ body:not(.stack) #grab{display:block;}
 #grab.held i{opacity:.8;transform:scaleX(1.2);}
 #grab:focus-visible{outline:2px solid var(--grab);outline-offset:-2px;border-radius:12px;}
 /* sync line: the one quiet word on how the phone stands with the vault; tap it for the connection sheet */
-#status{position:fixed;left:50%;bottom:calc(var(--sab) + 2px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
+#status{position:fixed;left:50%;top:calc(var(--fullh,100vh) - var(--insb,0px) - 46px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
   font-size:13px;color:var(--text3);white-space:nowrap;border-radius:99px;transition:opacity .2s;}
 #status i{width:7px;height:7px;border-radius:50%;background:var(--rule3);flex:none;}
 #status.warn{color:var(--duesoon);} #status.warn i{background:#f0a81c;}
@@ -120,7 +129,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 @media (max-width:380px){#hd h1{font-size:24px;}.lab .nm{font-size:19px;}.lab .g{font-size:13.5px;}}
 
 /* ══ the reading sheet: notes, PDFs and the connection panel, read-only, on the shell's own paper ══ */
-#sheet{position:fixed;inset:0;z-index:60;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);visibility:hidden;
+#sheet{position:fixed;left:0;top:0;width:100%;height:var(--fullh,100%);z-index:60;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);visibility:hidden;
   transition:transform .42s var(--ease),visibility 0s linear .42s;}
 #sheet.open{transform:none;visibility:visible;transition:transform .42s var(--ease);}
 #sheet>header{flex:none;display:flex;align-items:center;gap:2px;min-height:56px;padding:calc(var(--sat) + 4px) calc(6px + var(--sar)) 4px calc(6px + var(--sal));
@@ -130,7 +139,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 .ib{width:44px;height:44px;display:grid;place-items:center;border-radius:10px;color:var(--text2);flex:none;}
 .ib svg{width:22px;height:22px;}
 .ib:active{background:var(--surface-dim);color:var(--text);}
-#sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px calc(20px + var(--sar)) calc(var(--sab) + 48px) calc(20px + var(--sal));}
+#sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px calc(20px + var(--sar)) calc(var(--insb,0px) + 48px) calc(20px + var(--sal));}
 #sheet .body:focus{outline:none;}
 .md{max-width:65ch;margin:0 auto;font-size:16px;line-height:1.6;overflow-wrap:break-word;}
 .md>*+*{margin-top:.8em;}
@@ -186,7 +195,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 .btn[disabled]{opacity:.6;cursor:default;}
 .btn svg{width:19px;height:19px;}
 
-#setup{position:fixed;inset:0;z-index:80;background:var(--bg);overflow-y:auto;display:none;}
+#setup{position:fixed;left:0;top:0;width:100%;height:var(--fullh,100%);z-index:80;background:var(--bg);overflow-y:auto;display:none;}
 #setup.on{display:block;}
 #setup main{max-width:440px;margin:0 auto;padding:calc(var(--sat) + 44px) calc(24px + var(--sar)) calc(var(--sab) + 32px) calc(24px + var(--sal));}
 #setup h1{font-size:30px;margin-bottom:12px;}
@@ -216,7 +225,9 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 <div id="sa" aria-hidden="true"></div>
 <div class="island" aria-hidden="true"></div><div class="clock num" aria-hidden="true">7:09</div>
 <header id="hd"><h1 id="date">Today</h1><span class="wk num" id="wk"></span></header>
+<div id="basecap" aria-hidden="true"></div>
 <div id="wins"></div>
+<div id="cap" aria-hidden="true"></div>
 <div id="labels" role="list" aria-label="Apps"></div>
 <div id="deck" aria-hidden="true"></div>
 <div id="grab" role="button" tabindex="0" aria-label="Back to all apps"><i></i></div>
@@ -288,13 +299,44 @@ function toast(msg,ms=3200){const t=$('#toast');t.textContent=msg;t.classList.ad
 function applyTheme(){
   document.documentElement.dataset.theme=isDark()?'dark':'light';
 }
+/* the page under and around the open app takes the app's own colours: paper above (status cap included), its tab bar
+   colour below, so the app reads edge to edge like a native one. Home, or mid-gesture: the shell's paper. */
+function canvasFor(a){
+  const r=document.documentElement.style;
+  if(!a){['--canvas','--capc','--basec'].forEach(k=>r.removeProperty(k));return;}
+  const L=look(a);r.setProperty('--canvas',L.paper);r.setProperty('--capc',L.paper);r.setProperty('--basec',L.bar||L.paper);
+}
 applyTheme();
 
 /* ---------- safe areas: the shell measures them once and hands each app the numbers (env() reads 0 inside a frame) ---------- */
+/* home-screen app (standalone) = full screen: the shell owns every pixel down to the bottom edge */
+const STANDALONE=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches||P.get('standalone')==='1';
+/* The real screen. iOS home-screen apps (seen on iOS 26) can lay the page out on a viewport shorter than the screen by
+   the home-indicator band while still painting below it: anything sized inset:0 / 100% / 100dvh then stops short and
+   leaves a strip. In standalone the screen IS the window, so size from it. Only a small shortfall counts (a split
+   view or an open keyboard is a real, smaller window); clientHeight, not innerHeight, so the keyboard never shrinks it. */
+function screenBox(){
+  const vw=document.documentElement.clientWidth||innerWidth,vh=document.documentElement.clientHeight||innerHeight;
+  let H=vh,gap=0;
+  if(STANDALONE&&screen&&screen.height){
+    const portrait=vh>=vw,sh=portrait?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height);
+    if(sh>vh&&sh-vh<=80){gap=sh-vh;H=sh;}
+  }
+  return{W:vw,H,gap,portrait:vh>=vw};
+}
 function insets(){
-  if(document.documentElement.classList.contains('sim'))return innerWidth>innerHeight?{t:0,b:21,l:59,r:59}:{t:59,b:34,l:0,r:0};
+  const box=screenBox();
+  if(document.documentElement.classList.contains('sim'))return box.portrait?{t:59,b:34,l:0,r:0}:{t:0,b:21,l:59,r:59};
   const cs=getComputedStyle($('#sa'));
-  return{t:parseFloat(cs.paddingTop)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0,r:parseFloat(cs.paddingRight)||0};
+  const i={t:parseFloat(cs.paddingTop)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0,r:parseFloat(cs.paddingRight)||0};
+  /* the short viewport also reads the bottom inset as 0, though the home indicator sits over the frame we extend */
+  if(box.gap>0){i.b=Math.max(i.b,box.portrait?34:21);if(box.portrait&&i.t<20)i.t=box.H>=852?59:47;}
+  return i;
+}
+/* hand the numbers to the CSS: real height, real bottom inset, and the height of the status band the cap covers */
+function applyFrame(){
+  const box=screenBox(),i=insets(),r=document.documentElement.style;
+  r.setProperty('--fullh',box.H+'px');r.setProperty('--insb',i.b+'px');r.setProperty('--capH',(STANDALONE||document.documentElement.classList.contains('sim')?i.t:0)+'px');
 }
 /* the bar needs no room where there is a status-bar band to sit in; without one (landscape, desktop) it takes 20px */
 const grabBand=()=>insets().t>=44?0:20;
@@ -1059,7 +1101,7 @@ const SHELL={};
 let mode='stack',idx=0;
 const LAB_H=96,STATUS_H=46;
 function geo(){
-  const W=innerWidth,H=innerHeight,ins=insets(),hb=$('#hd').getBoundingClientRect().bottom;
+  const{W,H}=screenBox(),ins=insets(),hb=$('#hd').getBoundingClientRect().bottom;
   const top=hb+18,avail=H-top-LAB_H-Math.max(ins.b,6)-STATUS_H;
   const s=Math.max(.25,Math.min(avail/H,(W-128)/W)),cw=W*s,ch=H*s,gap=Math.max(14,W*.04);
   return{W,H,s,cw,ch,top,gap,x0:(W-cw)/2};
@@ -1086,7 +1128,7 @@ function layoutGrab(){
   const t=insets().t+grabBand(),h=Math.min(44,t),G=$('#grab');G.style.top=(t-h)+'px';G.style.height=h+'px';
   if(APPS[idx])G.style.setProperty('--grab',look(APPS[idx]).muted);
 }
-SHELL.repaint=()=>{renderLabels();layoutGrab();if(mode==='app')document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);};
+SHELL.repaint=()=>{applyFrame();renderLabels();layoutGrab();if(mode==='app'){document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);}};
 
 /* ── the one authored transition: the card grows into the app, and the app shrinks back into its card ── */
 let settleT=0;
@@ -1097,11 +1139,12 @@ function openApp(i){
   document.body.classList.add('anim');document.body.classList.remove('stack');mode='app';
   W.el.style.zIndex=30;APPS.forEach((b,j)=>{const w=WIN[b.id];if(w&&j!==i)w.el.style.zIndex=11;});
   place();document.documentElement.style.setProperty('--clock',look(a).ink);layoutGrab();
+  canvasFor(a);
   settle(()=>{if(mode!=='app')return;APPS.forEach((b,j)=>{const w=WIN[b.id];if(w&&j!==idx)w.el.classList.remove('on');});
     document.body.classList.remove('anim');try{W.f.focus();}catch(e){}});
 }
 function toStack(){
-  mode='stack';APPS.forEach(a=>{const w=ensureWin(a);w.el.classList.add('on');});
+  mode='stack';canvasFor(null);APPS.forEach(a=>{const w=ensureWin(a);w.el.classList.add('on');});
   document.body.classList.add('anim','stack');document.documentElement.style.removeProperty('--clock');
   renderLabels();APPS.forEach(a=>wantGlance(a.id,500));
   settle(()=>{if(mode==='stack')document.body.classList.remove('anim');
@@ -1117,7 +1160,7 @@ const SHRINK_AT=.22,FLICK=.0025;
 let gz=null;
 function shrinkStart(){
   if(mode!=='app'||gz)return false;
-  const t=performance.now();gz={p:0,v:0,lt:t};document.body.classList.remove('anim');
+  const t=performance.now();gz={p:0,v:0,lt:t};document.body.classList.remove('anim');canvasFor(null);
   APPS.forEach((a,i)=>{if(i===idx)return;const w=ensureWin(a);w.el.classList.add('on');});place();return true;
 }
 function shrinkTo(p){
@@ -1133,7 +1176,7 @@ function shrinkEnd(){
   if(!gz)return;const{p}=gz,v=performance.now()-gz.lt>90?0:gz.v;gz=null;$('#grab').style.transform='';
   const close=v>FLICK?p>.03:v<-FLICK?false:p>SHRINK_AT;
   if(close){toStack();return;}
-  document.body.classList.add('anim');place();settle(()=>{if(mode!=='app')return;document.body.classList.remove('anim');
+  canvasFor(APPS[idx]);document.body.classList.add('anim');place();settle(()=>{if(mode!=='app')return;document.body.classList.remove('anim');
     APPS.forEach((a,i)=>{const w=WIN[a.id];if(w&&i!==idx)w.el.classList.remove('on');});});
 }
 SHELL.pinch=(phase,r)=>{
@@ -1183,7 +1226,9 @@ document.addEventListener('keydown',e=>{
   if(mode!=='stack'||$('#sheet').classList.contains('open')||$('#setup').classList.contains('on'))return;
   if(e.key==='ArrowRight'||e.key==='ArrowLeft'){idx=Math.max(0,Math.min(APPS.length-1,idx+(e.key==='ArrowRight'?1:-1)));document.body.classList.add('anim');place();$(`.lab[data-i="${idx}"]`).focus({preventScroll:true});}
 });
-addEventListener('resize',()=>{place();layoutGrab();Object.values(WIN).forEach(w=>pushInsets(w.app));});
+function onGeometry(){applyFrame();place();layoutGrab();Object.values(WIN).forEach(w=>pushInsets(w.app));}
+addEventListener('resize',onGeometry);addEventListener('orientationchange',()=>setTimeout(onGeometry,250));
+applyFrame();
 MQ.addEventListener('change',()=>{if(TP)return;applyTheme();
   Object.values(WIN).forEach(W=>{paintWin(W);if(W.ready)themeMsgs(W.app).forEach(m=>post(W,m));});SHELL.repaint();});
 setInterval(()=>{if(mode==='stack'&&document.visibilityState==='visible')renderLabels();},60e3);
@@ -1268,7 +1313,7 @@ function start(){
   const o=P.get('open'),oi=APPS.findIndex(a=>a.id===o);
   if(oi>=0)idx=oi;
   renderLabels();
-  if(oi>=0){mode='app';document.body.classList.remove('stack');place();document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);
+  if(oi>=0){mode='app';document.body.classList.remove('stack');place();document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);
     APPS.forEach((a,i)=>{if(i!==idx)WIN[a.id].el.classList.remove('on');});WIN[APPS[idx].id].el.style.zIndex=30;
     /* screenshots only: &drag=0.4 freezes a grab-bar drag part-way */
     const dp=parseFloat(P.get('drag'));if(dp>0){setTimeout(()=>{shrinkStart();gz.force=true;$('#grab').classList.add('held');shrinkTo(dp);},P.get('dragAt')?+P.get('dragAt'):2500);}}
