@@ -1,6 +1,6 @@
 {
-  "name": "Study desk",
-  "short_name": "Study",
+  "name": "Study Desk",
+  "short_name": "Study Desk",
   "description": "Jaden's Timetable and Study Space, read from the vault.",
   "start_url": "./",
   "scope": "./",
