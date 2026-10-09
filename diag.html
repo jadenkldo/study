@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" id="sbs" content="black-translucent">
-<meta name="theme-color" id="tc" content="#00e5ff">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0c0c" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <title>Screen check</title>
 <!-- Screen check: a diagnostic page for the phone shell. It paints every pixel the page owns in a loud test colour,
@@ -57,25 +58,14 @@ a.b{background:#111;color:#fff;}
 <main>
   <h1>Screen check</h1>
   <table id="t"></table>
-  <div class="row">
-    <a class="b" href="./">Back</a>
-    <button type="button" data-tc="#00e5ff">Bar colour: cyan</button>
-    <button type="button" data-tc="#000000">black</button>
-    <button type="button" data-tc="#ffffff">white</button>
-    <button type="button" data-tc="#ff0000">red</button>
-    <button type="button" data-tc="">shell's</button>
-  </div>
-  <div class="row">
-    <button type="button" data-sbs="default">Status bar: default</button>
-    <button type="button" data-sbs="black">black</button>
-    <button type="button" data-sbs="black-translucent">black-translucent</button>
-  </div>
-  <p class="note">Pink is every pixel this page can paint; the black rules are its top and bottom edges. Striped bands are what iOS reports as safe areas. If a strip above or below the pink keeps changing with the "Bar colour" buttons, iOS paints it from theme-color; if it never changes, iOS owns it outright. The status-bar buttons change the meta tag live; iOS may only read it when the app starts, so if nothing changes, that is the answer. Take one screenshot in portrait (and one in landscape if you can).</p>
+  <div class="row"><a class="b" href="./">Back</a></div>
+  <p class="note">Pink is every pixel this page can paint; the black rules are its top and bottom edges, and the striped bands are what iOS reports as safe areas. Take one screenshot in portrait (and one in landscape if you can).</p>
+  <p class="note"><b>Found on iOS 27.0.1 (Oct 2026):</b> the page is 873 tall on a 932 screen and every fixed element stops at y=873, but the page's root background still fills the band below it (873&ndash;932) and the status strip. theme-color and apple-mobile-web-app-status-bar-style change nothing there, so the shell colours that band through the root background, and the apps' tab bars get a 6px bottom inset instead of 34.</p>
 </main>
 <script>
 'use strict';
 const P=new URLSearchParams(location.search),$=s=>document.querySelector(s);
-const shellTc=P.get('tc')||'';let shell=null;try{shell=JSON.parse(P.get('shell')||'null');}catch(e){}
+let shell=null;try{shell=JSON.parse(P.get('shell')||'null');}catch(e){}
 const h=id=>Math.round($(id).getBoundingClientRect().height*10)/10;
 function ruler(){
   const r=$('#ruler'),H=Math.max(document.documentElement.clientHeight,innerHeight);let html='';
@@ -101,9 +91,7 @@ function render(){
     ['100vh',h('#pvh')],['100dvh',h('#pdvh')],['100svh',h('#psvh')],['100lvh',h('#plvh')],['100% (fixed)',h('#ppct')],
     ['screen − clientHeight',(innerHeight>=innerWidth?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height))-document.documentElement.clientHeight],
     ['devicePixelRatio',devicePixelRatio],
-    ['theme-color now',$('#tc').content||'(none)'],
-    ['status-bar-style now',$('#sbs').content],
-    ['shell theme-color was',shellTc||'(not passed)'],
+    ['root background',getComputedStyle(document.documentElement).backgroundColor],
     ['shell insets (env, as read)',shell?`${shell.ins.t} / ${shell.ins.r} / ${shell.ins.b} / ${shell.ins.l}`:'(open from the shell)'],
     ['shell → apps (t / b)',shell?`${shell.app.t} / ${shell.app.b}`:'—'],
     ['shell: OS keeps strips',shell?(shell.strips?'yes':'no'):'—'],
@@ -115,8 +103,6 @@ function render(){
   $('#sat i').textContent=`env top ${ins[0]}px`;$('#sab i').textContent=`env bottom ${ins[2]}px`;
   ruler();
 }
-document.querySelectorAll('[data-sbs]').forEach(b=>b.addEventListener('click',()=>{$('#sbs').setAttribute('content',b.dataset.sbs);render();}));
-document.querySelectorAll('[data-tc]').forEach(b=>b.addEventListener('click',()=>{$('#tc').setAttribute('content',b.dataset.tc||shellTc||'#faf9f7');render();}));
 addEventListener('resize',render);addEventListener('orientationchange',()=>setTimeout(render,300));
 if(window.visualViewport){visualViewport.addEventListener('resize',render);visualViewport.addEventListener('scroll',render);}
 render();setInterval(render,1000);

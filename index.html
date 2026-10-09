@@ -7,7 +7,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Study">
-<meta name="theme-color" id="tc" content="#faf9f7">
+<meta name="theme-color" content="#faf9f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0c0c0c" media="(prefers-color-scheme: dark)">
 <meta name="color-scheme" content="light dark">
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.webmanifest">
@@ -51,7 +52,7 @@ html.sim{--sat:59px;--sab:34px;}
 [hidden]{display:none!important;}
 html,body{height:100%;}
 /* under everything: the open app's own paper, so no gap can ever show the shell's colour */
-html{background:var(--canvas,var(--bg));}
+html{background:var(--canvas,var(--bg));transition:background-color .2s;}
 body{background:transparent;color:var(--text);font-family:var(--font-ui);font-size:15px;line-height:1.45;overflow:hidden;
   -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;text-align:inherit;-webkit-appearance:none;appearance:none;}
@@ -104,14 +105,16 @@ body:not(.stack) #labels{opacity:0;transition:opacity .12s;}
 body.anim .lab{transition:transform .46s var(--ease);}
 #deck{position:fixed;inset:0;z-index:20;display:none;touch-action:pan-y;}
 body.stack #deck{display:block;}
-/* the grab bar: a sheet handle under the Dynamic Island. The 44px hit zone lives in the safe-area band, above both apps'
-   own top bars; only the 5px bar shows */
-#grab{position:fixed;left:50%;width:200px;margin-left:-100px;z-index:40;display:none;touch-action:none;cursor:grab;}
+/* the grab band: a full-width, see-through 44px strip laid over the top of the open app, starting just below the
+   status bar (iOS 27 keeps the strip beside the Dynamic Island for itself, so touches there never reach the page).
+   A downward drag that starts here takes the app home; a tap, a sideways move or an upward move is handed to the
+   app underneath, so its header controls keep working. Only the thin bar near its top shows. */
+#grab{position:fixed;left:0;right:0;z-index:40;display:none;touch-action:none;}
 body:not(.stack) #grab{display:block;}
-#grab i{position:absolute;left:50%;bottom:3px;width:38px;height:5px;margin-left:-19px;border-radius:3px;background:var(--grab,#6a635b);opacity:.5;transition:opacity .15s,transform .2s var(--ease);}
+#grab i{position:absolute;left:50%;top:5px;width:38px;height:5px;margin-left:-19px;border-radius:3px;background:var(--grab,#6a635b);opacity:.5;transition:opacity .15s,transform .2s var(--ease);}
 #grab.held i{opacity:.8;transform:scaleX(1.2);}
-#grab.band i{bottom:auto;top:50%;margin-top:-2.5px;}
-#grab:focus-visible{outline:2px solid var(--grab);outline-offset:-2px;border-radius:12px;}
+#grab:focus-visible{outline:none;}
+#grab:focus-visible i{opacity:1;outline:2px solid var(--grab);outline-offset:3px;}
 /* sync line: the one quiet word on how the phone stands with the vault; tap it for the connection sheet */
 #status{position:fixed;left:50%;bottom:calc(var(--pb,var(--sab)) + 2px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
   font-size:13px;color:var(--text3);white-space:nowrap;border-radius:99px;transition:opacity .2s;}
@@ -293,15 +296,15 @@ function applyTheme(){
   document.documentElement.dataset.theme=isDark()?'dark':'light';
   if(typeof canvasFor==='function')canvasFor(canvasApp);
 }
-/* the page behind the open app, and the system bars iOS keeps above and below it (theme-color), take the app's own
-   paper; home takes the shell's. One colour has to serve both bars, so it is the app's page colour: the top bar then
-   runs straight into the app's header, and the bottom band sits under a tab bar within a shade of it. */
+/* The page's root background is the one thing iOS 27 paints in the band it keeps below the page (Screen check, Oct
+   2026: the root colour filled 873-932 while every fixed element stopped at 873; theme-color changed nothing). So
+   while an app is open the root takes the app's tab-bar colour, and the tab bar reads as running to the screen edge;
+   home and the shrink gesture use the shell's paper. */
 let canvasApp=null;
 function canvasFor(a){
   canvasApp=a||null;
   const r=document.documentElement.style;
-  if(a)r.setProperty('--canvas',look(a).paper);else r.removeProperty('--canvas');
-  const tc=$('#tc');if(tc)tc.setAttribute('content',a?look(a).paper:(isDark()?'#0c0c0c':'#faf9f7'));
+  if(a)r.setProperty('--canvas',look(a).bar||look(a).paper);else r.removeProperty('--canvas');
 }
 applyTheme();
 
@@ -313,10 +316,6 @@ function insets(){
   const cs=getComputedStyle($('#sa'));
   return{t:parseFloat(cs.paddingTop)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0,r:parseFloat(cs.paddingRight)||0};
 }
-/* Where iOS gives the page its status-bar band (59px on this iPhone), the grab bar's 44px hit zone lives in it, above
-   both apps' headers. Where it doesn't (iOS 27 home-screen apps keep that strip for themselves and env() reads 0;
-   landscape; desktop), the open app gets a 44px band of its own paper at the top of the page instead, and its header
-   starts below it, so the zone never overlaps an app control and every touch in it reaches the page. */
 const STANDALONE=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches||P.get('standalone')==='1';
 /* iOS 27 home-screen apps: the OS keeps a strip at the top and the home-indicator band at the bottom, and the page sits
    between them, shorter than the screen. The band below already clears the home indicator, so the apps' tab bars get a
@@ -328,8 +327,7 @@ function osStrips(){
   return full-h>=30;
 }
 const TAB_PAD=6;
-const grabBand=()=>{const t=insets().t;return t>=44?0:44-t;};
-const appInsets=()=>{const i=insets();return{t:i.t+grabBand(),b:osStrips()?TAB_PAD:i.b,l:i.l,r:i.r};};
+const appInsets=()=>{const i=insets();return{t:i.t,b:osStrips()?TAB_PAD:i.b,l:i.l,r:i.r};};
 function applyPads(){document.documentElement.style.setProperty('--pb',(osStrips()?TAB_PAD:insets().b)+'px');}
 
 /* ══ storage: IndexedDB holds every file fetched from the vault (keyed by path, stamped with Drive's modified time),
@@ -517,9 +515,28 @@ function shellBridge(KIND,INS){
     subs.sort(function(a,b){return(b.title===active)-(a.title===active);});
     return{subs:subs,active:active};
   }
+  /* touches that landed on the shell's grab band but were not a drag home: replayed here on whatever is under them */
+  var pt=null,ly=0;
+  function pe(type,x,y,el){try{el.dispatchEvent(new PointerEvent(type,{bubbles:true,cancelable:true,composed:true,clientX:x,clientY:y,
+    pointerId:41,pointerType:'touch',isPrimary:true,button:0,buttons:type==='pointerup'||type==='pointercancel'?0:1}));}catch(err){}}
+  function me(type,x,y,el){try{el.dispatchEvent(new MouseEvent(type,{bubbles:true,cancelable:true,composed:true,view:window,clientX:x,clientY:y,button:0}));}catch(err){}}
+  function scroller(el){for(var n=el;n&&n!==document.documentElement;n=n.parentElement){var cs=getComputedStyle(n);
+    if(/(auto|scroll)/.test(cs.overflowY)&&n.scrollHeight>n.clientHeight)return n;}return document.scrollingElement;}
+  function ptr(d){
+    var x=+d.x||0,y=+d.y||0;
+    if(d.phase==='tap'){var el=document.elementFromPoint(x,y);if(!el)return;
+      pe('pointerdown',x,y,el);me('mousedown',x,y,el);pe('pointerup',x,y,el);me('mouseup',x,y,el);
+      var f=el.closest&&el.closest('input,textarea,select,[contenteditable="true"]');if(f&&f.focus)f.focus();
+      me('click',x,y,el);return;}
+    if(d.phase==='down'){pt=document.elementFromPoint(x,y);ly=y;if(pt)pe('pointerdown',x,y,pt);return;}
+    if(!pt)return;
+    if(d.phase==='move'){pe('pointermove',x,y,pt);if(d.axis==='y'){var sc=scroller(pt);if(sc)sc.scrollTop+=ly-y;}ly=y;}
+    else{pe(d.phase==='cancel'?'pointercancel':'pointerup',x,y,pt);pt=null;}
+  }
   addEventListener('message',function(e){
     if(e.source!==parent)return;var d=e.data;if(!d||typeof d!=='object')return;
     if(d.type==='shell-insets')insets(d);
+    else if(d.type==='shell-ptr')ptr(d);
     else if(d.type==='shell-glance?'){var g=null;try{g=KIND==='tt'?ttGlance():ssGlance();}catch(err){g={error:String(err&&err.message||err)};}post({type:'shell-glance',model:g});}
   });
   var d0=1,on=false;
@@ -1181,7 +1198,7 @@ function renderLabels(){
   place();
 }
 function layoutGrab(){
-  const t=insets().t+grabBand(),h=Math.min(44,t),G=$('#grab');G.style.top=(t-h)+'px';G.style.height=h+'px';G.classList.toggle('band',grabBand()>0);
+  const G=$('#grab');G.style.top=insets().t+'px';G.style.height='44px';
   if(APPS[idx])G.style.setProperty('--grab',look(APPS[idx]).muted);
 }
 SHELL.repaint=()=>{renderLabels();layoutGrab();if(mode==='app'){document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);}};
@@ -1240,16 +1257,27 @@ SHELL.pinch=(phase,r)=>{
   else if(phase==='move')shrinkTo((1-(+r||1))/.45);
   else if(phase==='end')shrinkEnd();
 };
-/* the grab bar: drag down only; a tap does nothing, so a stray touch never leaves the app */
+/* the grab band: decide what a touch is from its first 8px of travel. Down: the shrink gesture. Sideways or up: the
+   whole stroke goes to the app (a day swipe, a scroll). No travel: a tap, delivered to whatever is under the finger. */
 (function(){
   const G=$('#grab');let st=null;
-  G.addEventListener('pointerdown',e=>{if(mode!=='app')return;st={y:e.clientY,on:false};G.setPointerCapture(e.pointerId);G.classList.add('held');document.body.classList.add('held');});
-  G.addEventListener('pointermove',e=>{if(!st)return;const dy=e.clientY-st.y;
-    if(!st.on&&dy>6)st.on=shrinkStart();
-    if(st.on)shrinkTo((dy-6)/(innerHeight*.34));});
-  const up=()=>{if(!st)return;const on=st.on;st=null;G.classList.remove('held');document.body.classList.remove('held');if(on)shrinkEnd();};
+  const fwd=(phase,e,axis)=>{const W=WIN[APPS[idx]&&APPS[idx].id];if(!W)return;const r=W.f.getBoundingClientRect();
+    post(W,{type:'shell-ptr',phase,axis,x:e.clientX-r.left,y:e.clientY-r.top});};
+  G.addEventListener('pointerdown',e=>{if(mode!=='app'||(e.pointerType==='mouse'&&e.button!==0))return;
+    st={x:e.clientX,y:e.clientY,kind:null,on:false};try{G.setPointerCapture(e.pointerId);}catch(_){}});
+  G.addEventListener('pointermove',e=>{if(!st)return;const dx=e.clientX-st.x,dy=e.clientY-st.y;
+    if(!st.kind){
+      if(dy>8&&dy>Math.abs(dx)){st.kind='drag';G.classList.add('held');document.body.classList.add('held');st.on=shrinkStart();}
+      else if(Math.abs(dx)>8||dy<-8){st.kind='pass';st.axis=Math.abs(dx)>=Math.abs(dy)?'x':'y';fwd('down',{clientX:st.x,clientY:st.y},st.axis);}
+    }
+    if(st.kind==='drag'&&st.on)shrinkTo((dy-8)/(innerHeight*.34));
+    else if(st.kind==='pass')fwd('move',e,st.axis);});
+  const up=e=>{if(!st)return;const s=st;st=null;G.classList.remove('held');document.body.classList.remove('held');
+    if(s.kind==='drag'){if(s.on)shrinkEnd();}
+    else if(s.kind==='pass')fwd(e.type==='pointercancel'?'cancel':'up',e,s.axis);
+    else if(e.type==='pointerup')fwd('tap',e);};
   G.addEventListener('pointerup',up);G.addEventListener('pointercancel',up);
-  /* keyboard has no drag: Enter or Space on the focused bar goes back to the stack */
+  /* keyboard has no drag: Enter or Space on the focused band goes back to the stack */
   G.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&mode==='app'){e.preventDefault();toStack();}});
 })();
 /* trackpad pinch on a laptop arrives as ctrl+wheel; feed it to the same gesture */
@@ -1358,7 +1386,7 @@ $('#status').addEventListener('click',()=>{
     toast(!navigator.onLine?'No connection. Your changes stay on this phone.':NET.fails?'Couldn\'t reach the vault. Your changes stay on this phone.':'Synced');});
   $('#cx-edit').addEventListener('click',()=>{sheetClose();showSetup(true);});
   $('#cx-reload').addEventListener('click',()=>{sheetClose();APPS.forEach(a=>loadApp(a));});
-  $('#cx-diag').href='diag.html?tc='+encodeURIComponent(($('#tc')||{}).content||'')+'&shell='+encodeURIComponent(JSON.stringify({ins:insets(),app:appInsets(),strips:osStrips(),standalone:STANDALONE}));
+  $('#cx-diag').href='diag.html?shell='+encodeURIComponent(JSON.stringify({ins:insets(),app:appInsets(),strips:osStrips(),standalone:STANDALONE}));
   $('#cx-forget').addEventListener('click',async()=>{
     if(pending()&&!confirm('There are changes that haven\'t reached the vault yet. Forget this phone anyway? They will be lost.'))return;
     if(!pending()&&!confirm('Forget the gatekeeper and clear everything cached on this phone?'))return;
