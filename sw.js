@@ -3,8 +3,8 @@
    Drive's modified time, and the gatekeeper's calls always go straight to the network.
    index.html and apps.json are network-first (so a new upload reaches the phone on the next open, and offline falls
    back to the last copy); the rest of the shell answers from cache and refreshes behind; Google Fonts are kept once fetched. */
-const SHELL = 'study-shell-v3', FONTS = 'study-fonts-v1';   /* bump SHELL on every shell upload */
-const CORE = ['./', 'index.html', 'apps.json', 'manifest.webmanifest', 'vendor/marked.min.js',
+const SHELL = 'study-shell-v4', FONTS = 'study-fonts-v1';   /* bump SHELL on every shell upload */
+const CORE = ['./', 'index.html', 'diag.html', 'apps.json', 'manifest.webmanifest', 'vendor/marked.min.js',
   'icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -48,6 +48,6 @@ self.addEventListener('fetch', e => {
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') { e.respondWith(fonts(req)); return; }
   if (url.origin !== self.location.origin) return;               /* the gatekeeper and everything else: untouched */
   const rel = url.pathname.slice(new URL(self.registration.scope).pathname.length);
-  if (rel === '' || rel === 'index.html' || rel === 'apps.json' || req.mode === 'navigate') e.respondWith(networkFirst(req));
+  if (rel === '' || rel === 'index.html' || rel === 'apps.json' || rel === 'diag.html' || req.mode === 'navigate') e.respondWith(networkFirst(req));
   else e.respondWith(cacheFirst(req));
 });

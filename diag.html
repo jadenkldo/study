@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" id="sbs" content="black-translucent">
+<meta name="theme-color" id="tc" content="#00e5ff">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Screen check</title>
+<!-- Screen check: a diagnostic page for the phone shell. It paints every pixel the page owns in a loud test colour,
+     rules the page's top and bottom edges, marks what iOS reports as safe areas, and lists every size the shell could
+     base its layout on. A screenshot of it shows exactly which strips the page can paint and which ones iOS keeps.
+     Nothing here is saved or sent anywhere. -->
+<style>
+:root{--test:#ff2d8a;--sat:env(safe-area-inset-top,0px);--sar:env(safe-area-inset-right,0px);--sab:env(safe-area-inset-bottom,0px);--sal:env(safe-area-inset-left,0px);color-scheme:light;}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;background:var(--test);}
+body{font:16px/1.35 -apple-system,system-ui,sans-serif;color:#111;overflow:hidden;-webkit-text-size-adjust:100%;}
+/* every pixel the page can paint is the test colour; these mark the edges and the reported safe areas */
+.edge{position:fixed;left:0;right:0;height:0;border-top:1px solid #000;z-index:5;pointer-events:none;}
+.edge b{position:absolute;left:8px;font:700 12px/1 ui-monospace,Menlo,monospace;background:#000;color:#fff;padding:3px 6px;border-radius:3px;}
+#etop{top:0;} #etop b{top:2px;}
+#ebot{bottom:0;border-top:0;border-bottom:1px solid #000;} #ebot b{bottom:2px;}
+.sa{position:fixed;left:0;right:0;z-index:4;pointer-events:none;background:repeating-linear-gradient(45deg,rgba(255,230,0,.85) 0 8px,rgba(0,0,0,.85) 8px 16px);}
+#sat{top:0;height:var(--sat);} #sab{bottom:0;height:var(--sab);}
+#sat i{top:4px;transform:none;} #sab i{top:auto;bottom:4px;transform:none;}   /* readable even when the band is 0 tall */
+.sa i{position:absolute;right:8px;top:50%;transform:translateY(-50%);font:700 12px/1 ui-monospace,Menlo,monospace;background:#ffe600;color:#000;padding:3px 6px;border-radius:3px;font-style:normal;}
+#ruler{position:fixed;left:0;top:0;bottom:0;width:30px;z-index:3;pointer-events:none;}
+#ruler span{position:absolute;left:0;width:10px;border-top:1px solid #000;font:600 9px/1 ui-monospace,Menlo,monospace;}
+#ruler span em{position:absolute;left:12px;top:-5px;font-style:normal;}
+main{position:fixed;left:34px;right:10px;top:calc(var(--sat) + 30px);bottom:calc(var(--sab) + 30px);overflow:auto;-webkit-overflow-scrolling:touch;z-index:6;
+  background:#fff;border-radius:12px;padding:14px 14px 20px;box-shadow:0 2px 0 #000;}
+h1{font-size:22px;margin-bottom:10px;}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;}
+td{padding:5px 0;border-bottom:1px solid #e5e5e5;vertical-align:top;font-size:15px;}
+td:first-child{color:#555;padding-right:10px;white-space:nowrap;}
+td:last-child{font:600 15px/1.3 ui-monospace,Menlo,monospace;text-align:right;word-break:break-word;}
+.row{display:flex;gap:8px;margin:12px 0 0;flex-wrap:wrap;}
+button,a.b{min-height:44px;padding:0 14px;border:1px solid #111;border-radius:10px;background:#fff;color:#111;font:600 15px/1 -apple-system,system-ui,sans-serif;display:inline-flex;align-items:center;text-decoration:none;}
+a.b{background:#111;color:#fff;}
+.note{font-size:13px;color:#555;margin-top:10px;}
+.probe{position:fixed;left:-10px;top:0;width:1px;visibility:hidden;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="ruler" aria-hidden="true"></div>
+<div class="sa" id="sat" aria-hidden="true"><i>env top</i></div>
+<div class="sa" id="sab" aria-hidden="true"><i>env bottom</i></div>
+<div class="edge" id="etop" aria-hidden="true"><b>PAGE TOP · y=0</b></div>
+<div class="edge" id="ebot" aria-hidden="true"><b id="ebl">PAGE BOTTOM</b></div>
+<div class="probe" id="pvh" style="height:100vh"></div><div class="probe" id="pdvh" style="height:100dvh"></div>
+<div class="probe" id="psvh" style="height:100svh"></div><div class="probe" id="plvh" style="height:100lvh"></div>
+<div class="probe" id="ppct" style="height:100%"></div>
+<div class="probe" id="psa" style="padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)"></div>
+<main>
+  <h1>Screen check</h1>
+  <table id="t"></table>
+  <div class="row">
+    <a class="b" href="./">Back</a>
+    <button type="button" data-tc="#00e5ff">Bar colour: cyan</button>
+    <button type="button" data-tc="#000000">black</button>
+    <button type="button" data-tc="#ffffff">white</button>
+    <button type="button" data-tc="#ff0000">red</button>
+    <button type="button" data-tc="">shell's</button>
+  </div>
+  <div class="row">
+    <button type="button" data-sbs="default">Status bar: default</button>
+    <button type="button" data-sbs="black">black</button>
+    <button type="button" data-sbs="black-translucent">black-translucent</button>
+  </div>
+  <p class="note">Pink is every pixel this page can paint; the black rules are its top and bottom edges. Striped bands are what iOS reports as safe areas. If a strip above or below the pink keeps changing with the "Bar colour" buttons, iOS paints it from theme-color; if it never changes, iOS owns it outright. The status-bar buttons change the meta tag live; iOS may only read it when the app starts, so if nothing changes, that is the answer. Take one screenshot in portrait (and one in landscape if you can).</p>
+</main>
+<script>
+'use strict';
+const P=new URLSearchParams(location.search),$=s=>document.querySelector(s);
+const shellTc=P.get('tc')||'';let shell=null;try{shell=JSON.parse(P.get('shell')||'null');}catch(e){}
+const h=id=>Math.round($(id).getBoundingClientRect().height*10)/10;
+function ruler(){
+  const r=$('#ruler'),H=Math.max(document.documentElement.clientHeight,innerHeight);let html='';
+  for(let y=0;y<=H;y+=50)html+=`<span style="top:${y}px"><em>${y}</em></span>`;r.innerHTML=html;
+}
+function render(){
+  const sa=getComputedStyle($('#psa')),px=v=>Math.round(parseFloat(v)*10)/10;
+  const ins=[px(sa.paddingTop),px(sa.paddingRight),px(sa.paddingBottom),px(sa.paddingLeft)];
+  const vv=window.visualViewport;
+  const sa2=(ins[0]||ins[2])?'':' (all 0)';
+  const rows=[
+    ['standalone (home-screen app)',(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)?'yes':'no'],
+    ['display-mode',['fullscreen','standalone','minimal-ui','browser'].find(m=>matchMedia(`(display-mode: ${m})`).matches)||'?'],
+    ['orientation',innerHeight>=innerWidth?'portrait':'landscape'],
+    ['screen w × h',`${screen.width} × ${screen.height}`],
+    ['screen avail w × h',`${screen.availWidth} × ${screen.availHeight}`],
+    ['innerWidth × innerHeight',`${innerWidth} × ${innerHeight}`],
+    ['clientWidth × clientHeight',`${document.documentElement.clientWidth} × ${document.documentElement.clientHeight}`],
+    ['outerWidth × outerHeight',`${outerWidth} × ${outerHeight}`],
+    ['visualViewport w × h',vv?`${Math.round(vv.width*10)/10} × ${Math.round(vv.height*10)/10}`:'n/a'],
+    ['visualViewport offsetTop',vv?`${Math.round(vv.offsetTop*10)/10} (pageTop ${Math.round(vv.pageTop*10)/10})`:'n/a'],
+    ['env safe-area t r b l'+sa2,ins.join(' / ')],
+    ['100vh',h('#pvh')],['100dvh',h('#pdvh')],['100svh',h('#psvh')],['100lvh',h('#plvh')],['100% (fixed)',h('#ppct')],
+    ['screen − clientHeight',(innerHeight>=innerWidth?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height))-document.documentElement.clientHeight],
+    ['devicePixelRatio',devicePixelRatio],
+    ['theme-color now',$('#tc').content||'(none)'],
+    ['status-bar-style now',$('#sbs').content],
+    ['shell theme-color was',shellTc||'(not passed)'],
+    ['shell insets (env, as read)',shell?`${shell.ins.t} / ${shell.ins.r} / ${shell.ins.b} / ${shell.ins.l}`:'(open from the shell)'],
+    ['shell → apps (t / b)',shell?`${shell.app.t} / ${shell.app.b}`:'—'],
+    ['shell: OS keeps strips',shell?(shell.strips?'yes':'no'):'—'],
+    ['iOS',(/OS (\d+[_\d]*)/.exec(navigator.userAgent)||[])[1]?.replace(/_/g,'.')||'?'],
+    ['user agent',navigator.userAgent],
+  ];
+  $('#t').innerHTML=rows.map(([k,v])=>`<tr><td>${k}</td><td>${String(v).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</td></tr>`).join('');
+  $('#ebl').textContent=`PAGE BOTTOM · y=${document.documentElement.clientHeight}`;
+  $('#sat i').textContent=`env top ${ins[0]}px`;$('#sab i').textContent=`env bottom ${ins[2]}px`;
+  ruler();
+}
+document.querySelectorAll('[data-sbs]').forEach(b=>b.addEventListener('click',()=>{$('#sbs').setAttribute('content',b.dataset.sbs);render();}));
+document.querySelectorAll('[data-tc]').forEach(b=>b.addEventListener('click',()=>{$('#tc').setAttribute('content',b.dataset.tc||shellTc||'#faf9f7');render();}));
+addEventListener('resize',render);addEventListener('orientationchange',()=>setTimeout(render,300));
+if(window.visualViewport){visualViewport.addEventListener('resize',render);visualViewport.addEventListener('scroll',render);}
+render();setInterval(render,1000);
+</script>
+</body>
+</html>

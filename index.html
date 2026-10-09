@@ -110,9 +110,10 @@ body.stack #deck{display:block;}
 body:not(.stack) #grab{display:block;}
 #grab i{position:absolute;left:50%;bottom:3px;width:38px;height:5px;margin-left:-19px;border-radius:3px;background:var(--grab,#6a635b);opacity:.5;transition:opacity .15s,transform .2s var(--ease);}
 #grab.held i{opacity:.8;transform:scaleX(1.2);}
+#grab.band i{bottom:auto;top:50%;margin-top:-2.5px;}
 #grab:focus-visible{outline:2px solid var(--grab);outline-offset:-2px;border-radius:12px;}
 /* sync line: the one quiet word on how the phone stands with the vault; tap it for the connection sheet */
-#status{position:fixed;left:50%;bottom:calc(var(--sab) + 2px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
+#status{position:fixed;left:50%;bottom:calc(var(--pb,var(--sab)) + 2px);transform:translateX(-50%);z-index:25;min-height:44px;padding:0 16px;display:flex;align-items:center;gap:8px;
   font-size:13px;color:var(--text3);white-space:nowrap;border-radius:99px;transition:opacity .2s;}
 #status i{width:7px;height:7px;border-radius:50%;background:var(--rule3);flex:none;}
 #status.warn{color:var(--duesoon);} #status.warn i{background:#f0a81c;}
@@ -133,7 +134,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 .ib{width:44px;height:44px;display:grid;place-items:center;border-radius:10px;color:var(--text2);flex:none;}
 .ib svg{width:22px;height:22px;}
 .ib:active{background:var(--surface-dim);color:var(--text);}
-#sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px calc(20px + var(--sar)) calc(var(--sab) + 48px) calc(20px + var(--sal));}
+#sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px calc(20px + var(--sar)) calc(var(--pb,var(--sab)) + 48px) calc(20px + var(--sal));}
 #sheet .body:focus{outline:none;}
 .md{max-width:65ch;margin:0 auto;font-size:16px;line-height:1.6;overflow-wrap:break-word;}
 .md>*+*{margin-top:.8em;}
@@ -312,9 +313,24 @@ function insets(){
   const cs=getComputedStyle($('#sa'));
   return{t:parseFloat(cs.paddingTop)||0,b:parseFloat(cs.paddingBottom)||0,l:parseFloat(cs.paddingLeft)||0,r:parseFloat(cs.paddingRight)||0};
 }
-/* the bar needs no room where there is a status-bar band to sit in; without one (landscape, desktop) it takes 20px */
-const grabBand=()=>insets().t>=44?0:20;
-const appInsets=()=>{const i=insets();return{t:i.t+grabBand(),b:i.b,l:i.l,r:i.r};};
+/* Where iOS gives the page its status-bar band (59px on this iPhone), the grab bar's 44px hit zone lives in it, above
+   both apps' headers. Where it doesn't (iOS 27 home-screen apps keep that strip for themselves and env() reads 0;
+   landscape; desktop), the open app gets a 44px band of its own paper at the top of the page instead, and its header
+   starts below it, so the zone never overlaps an app control and every touch in it reaches the page. */
+const STANDALONE=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches||P.get('standalone')==='1';
+/* iOS 27 home-screen apps: the OS keeps a strip at the top and the home-indicator band at the bottom, and the page sits
+   between them, shorter than the screen. The band below already clears the home indicator, so the apps' tab bars get a
+   small even padding instead of a second 34px under the icons. */
+function osStrips(){
+  if(!STANDALONE||!screen||!screen.height)return false;
+  const w=document.documentElement.clientWidth||innerWidth,h=document.documentElement.clientHeight||innerHeight;
+  const full=h>=w?Math.max(screen.width,screen.height):Math.min(screen.width,screen.height);
+  return full-h>=30;
+}
+const TAB_PAD=6;
+const grabBand=()=>{const t=insets().t;return t>=44?0:44-t;};
+const appInsets=()=>{const i=insets();return{t:i.t+grabBand(),b:osStrips()?TAB_PAD:i.b,l:i.l,r:i.r};};
+function applyPads(){document.documentElement.style.setProperty('--pb',(osStrips()?TAB_PAD:insets().b)+'px');}
 
 /* ══ storage: IndexedDB holds every file fetched from the vault (keyed by path, stamped with Drive's modified time),
    the last state each app saved while offline, the glances and the note list ══ */
@@ -1141,7 +1157,7 @@ const SHELL={};
 let mode='stack',idx=0;
 const LAB_H=96,STATUS_H=46;
 function geo(){
-  const{W,H}=viewBox(),ins=insets(),hb=$('#hd').getBoundingClientRect().bottom;
+  const{W,H}=viewBox(),ins=Object.assign({},insets(),{b:osStrips()?TAB_PAD:insets().b}),hb=$('#hd').getBoundingClientRect().bottom;
   const top=hb+18,avail=H-top-LAB_H-Math.max(ins.b,6)-STATUS_H;
   const s=Math.max(.25,Math.min(avail/H,(W-128)/W)),cw=W*s,ch=H*s,gap=Math.max(14,W*.04);
   return{W,H,s,cw,ch,top,gap,x0:(W-cw)/2};
@@ -1165,7 +1181,7 @@ function renderLabels(){
   place();
 }
 function layoutGrab(){
-  const t=insets().t+grabBand(),h=Math.min(44,t),G=$('#grab');G.style.top=(t-h)+'px';G.style.height=h+'px';
+  const t=insets().t+grabBand(),h=Math.min(44,t),G=$('#grab');G.style.top=(t-h)+'px';G.style.height=h+'px';G.classList.toggle('band',grabBand()>0);
   if(APPS[idx])G.style.setProperty('--grab',look(APPS[idx]).muted);
 }
 SHELL.repaint=()=>{renderLabels();layoutGrab();if(mode==='app'){document.documentElement.style.setProperty('--clock',look(APPS[idx]).ink);canvasFor(APPS[idx]);}};
@@ -1266,9 +1282,10 @@ document.addEventListener('keydown',e=>{
   if(mode!=='stack'||$('#sheet').classList.contains('open')||$('#setup').classList.contains('on'))return;
   if(e.key==='ArrowRight'||e.key==='ArrowLeft'){idx=Math.max(0,Math.min(APPS.length-1,idx+(e.key==='ArrowRight'?1:-1)));document.body.classList.add('anim');place();$(`.lab[data-i="${idx}"]`).focus({preventScroll:true});}
 });
-function onGeometry(){place();layoutGrab();Object.values(WIN).forEach(w=>pushInsets(w.app));}
+function onGeometry(){applyPads();place();layoutGrab();Object.values(WIN).forEach(w=>pushInsets(w.app));}
 addEventListener('resize',onGeometry);addEventListener('orientationchange',()=>setTimeout(onGeometry,250));
 if(window.visualViewport)visualViewport.addEventListener('resize',onGeometry);
+applyPads();
 MQ.addEventListener('change',()=>{if(TP)return;applyTheme();
   Object.values(WIN).forEach(W=>{paintWin(W);if(W.ready)themeMsgs(W.app).forEach(m=>post(W,m));});SHELL.repaint();});
 setInterval(()=>{if(mode==='stack'&&document.visibilityState==='visible')renderLabels();},60e3);
@@ -1334,12 +1351,14 @@ $('#status').addEventListener('click',()=>{
   <div class="acts"><button class="btn quiet" type="button" id="cx-sync">Sync now</button>
   <button class="btn quiet" type="button" id="cx-edit">Change the URL or key</button>
   <button class="btn quiet" type="button" id="cx-reload">Reload both apps</button>
+  <a class="btn quiet" id="cx-diag" href="diag.html">Screen check</a>
   <button class="btn quiet danger" type="button" id="cx-forget">Forget this phone</button></div>`);
   $('#cx-sync').addEventListener('click',async()=>{const b=$('#cx-sync');b.textContent='Syncing';b.disabled=true;
     NET.fails=0;revalidate.busy=false;await revalidate();b.textContent='Sync now';b.disabled=false;sheetRefresh();
     toast(!navigator.onLine?'No connection. Your changes stay on this phone.':NET.fails?'Couldn\'t reach the vault. Your changes stay on this phone.':'Synced');});
   $('#cx-edit').addEventListener('click',()=>{sheetClose();showSetup(true);});
   $('#cx-reload').addEventListener('click',()=>{sheetClose();APPS.forEach(a=>loadApp(a));});
+  $('#cx-diag').href='diag.html?tc='+encodeURIComponent(($('#tc')||{}).content||'')+'&shell='+encodeURIComponent(JSON.stringify({ins:insets(),app:appInsets(),strips:osStrips(),standalone:STANDALONE}));
   $('#cx-forget').addEventListener('click',async()=>{
     if(pending()&&!confirm('There are changes that haven\'t reached the vault yet. Forget this phone anyway? They will be lost.'))return;
     if(!pending()&&!confirm('Forget the gatekeeper and clear everything cached on this phone?'))return;
