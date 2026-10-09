@@ -144,6 +144,13 @@ body.stack #homekey{display:none;}
 #status i{width:7px;height:7px;border-radius:50%;background:var(--rule3);flex:none;}
 #status.warn{color:var(--duesoon);} #status.warn i{background:#f0a81c;}
 #status.bad{color:var(--overdue);} #status.bad i{background:var(--overdue);}
+/* the dot says the state at a glance (Jaden, Oct 2026): green up to date · spinning ring while saving · amber changes
+   waiting · red offline / can't reach the vault / not saved. The words beside it always say it too. */
+#status.ok i{background:#1a9a4b;}
+#status.off{color:var(--overdue);} #status.off i{background:var(--overdue);}
+#status.saving i{background:none;border:1.5px solid var(--rule3);border-top-color:var(--text2);width:9px;height:9px;animation:stSpin .8s linear infinite;}
+@keyframes stSpin{to{transform:rotate(360deg);}}
+html.rm #status.saving i{animation:none;border-color:#f0a81c;}
 #status:active{background:var(--surface-dim);}
 body:not(.stack) #status{opacity:0;pointer-events:none;}
 @media (max-width:380px){.lab .nm{font-size:19px;}.lab .g{font-size:13.5px;}}
@@ -310,7 +317,7 @@ const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
-const SHELL_VERSION='v9',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v10',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -766,13 +773,13 @@ function syncLine(){
   let txt,cls='';
   const ch=`${n} change${n>1?'s':''} waiting`;
   if(!GK)txt='Not connected';
-  else if(!navigator.onLine){txt=n?'Offline · '+ch:'Offline · showing your last copy';cls='warn';}
-  else if(NET.fails>=2){txt=n?'Can\'t reach the vault · '+ch:'Can\'t reach the vault · retrying';cls='warn';}
-  else if(busy)txt='Saving';
+  else if(!navigator.onLine){txt=n?'Offline · '+ch:'Offline · showing your last copy';cls='off';}
+  else if(NET.fails>=2){txt=n?'Can\'t reach the vault · '+ch:'Can\'t reach the vault · retrying';cls='off';}
+  else if(busy){txt='Saving';cls='saving';}
   else if(n&&Object.values(SYNC).some(s=>s.err&&s.local)){txt=`Not saved yet · ${n} change${n>1?'s':''} kept on this phone`;cls='bad';}
-  else if(n)txt=`${n} change${n>1?'s':''} waiting`;
-  else if(lastSync)txt='Up to date · '+clock(new Date(lastSync));
-  else txt='Up to date';
+  else if(n){txt=`${n} change${n>1?'s':''} waiting`;cls='warn';}
+  else if(lastSync){txt='Up to date · '+clock(new Date(lastSync));cls='ok';}
+  else{txt='Up to date';cls='ok';}
   b.className=cls;b.querySelector('span').textContent=txt;
   b.setAttribute('aria-label',txt+'. Connection settings');
 }
