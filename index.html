@@ -322,7 +322,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* both apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v23',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v24',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -1633,8 +1633,8 @@ function openSettings(){
     <p class="note">${PREF.openTo==='last'?'The app and page you were last on.':'The Timetable, on Today.'}</p>
   <h3>Apps</h3><ol class="reorder" id="set-order" aria-label="App order"></ol>
     <p class="note">The order of the cards on this screen and of swiping on the tab bar. You can also hold a card and drag it.</p>
-  <h3>Appearance</h3><p class="lbl">Theme</p>${seg('theme',PREF.theme,[['auto','Match iPhone'],['light','Light'],['dark','Dark']])}
-  <h3>Motion</h3><p class="lbl">Reduce motion</p>${seg('motion',PREF.motion,[['auto','Match iPhone'],['on','On']])}
+  <h3>Appearance</h3><p class="lbl">Theme</p>${seg('theme',PREF.theme,[['auto','System'],['light','Light'],['dark','Dark']])}
+  <h3>Motion</h3><p class="lbl">Reduce motion</p>${seg('motion',PREF.motion,[['auto','System'],['on','On']])}
   <h3>Data</h3><div class="rowinfo"><div><span>SQL engine</span><span class="num" id="set-pg">${esc(pgLine())}</span></div></div>
     <div class="acts"><button class="btn quiet" type="button" id="set-pgdl"${PG.state==='ready'?' hidden':''}>Download now</button>
     <button class="btn quiet" type="button" id="set-clear">Clear saved copies</button></div>
