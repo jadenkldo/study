@@ -82,7 +82,8 @@ h1,h2,h3,.serif{font-family:var(--font-display);font-weight:600;letter-spacing:-
 body.stack #cap,body.gz #cap{display:none;}
 .win{position:absolute;inset:0;visibility:hidden;pointer-events:none;overflow:hidden;background:var(--wp);}
 .win.on{visibility:visible;pointer-events:auto;}
-.win iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:var(--wp);}
+/* wide frames (iPad): the apps' desktop layouts take no insets, so the frame itself sits clear of the cap and the bottom inset */
+.win iframe{position:absolute;top:var(--ft,0px);bottom:var(--fb,0px);left:var(--fl,0px);right:var(--fr,0px);width:auto;height:auto;border:0;display:block;background:var(--wp);}
 .win .wait{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;padding:40px;text-align:center;color:var(--wm);font-size:17px;line-height:1.4;}
 .win .wait b{font:600 30px/1.15 var(--font-display);letter-spacing:-.015em;color:var(--wi);}
 .win .wait button{margin-top:10px;min-height:48px;padding:0 22px;border-radius:10px;border:1px solid var(--wl);color:var(--wi);font-weight:600;pointer-events:auto;}
@@ -317,7 +318,7 @@ const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
-const SHELL_VERSION='v13',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v15',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -394,7 +395,12 @@ const BLUR_CLEAR=20;
 const capH=()=>osStrips()?insets().t+BLUR_CLEAR:0;
 const appInsets=()=>{const i=insets(),st=osStrips();return{t:st?i.t+BLUR_CLEAR:i.t,b:st?TAB_PAD:i.b,l:i.l,r:i.r};};
 function applyPads(){const r=document.documentElement.style,st=osStrips();r.setProperty('--pb',(st?TAB_PAD:insets().b)+'px');r.setProperty('--capH',capH()+'px');
-  r.setProperty('--hdt',(st?insets().t+BLUR_CLEAR:insets().t+8)+'px');}
+  r.setProperty('--hdt',(st?insets().t+BLUR_CLEAR:insets().t+8)+'px');
+  /* above the apps' phone breakpoint (600px) their desktop layouts ignore the insets, so the frame is inset instead */
+  const i=insets(),wide=viewBox().W>PHONE_MAX;
+  r.setProperty('--ft',(wide?Math.max(capH(),i.t):0)+'px');r.setProperty('--fb',(wide&&!st?i.b:0)+'px');
+  r.setProperty('--fl',(wide?i.l:0)+'px');r.setProperty('--fr',(wide?i.r:0)+'px');}
+const PHONE_MAX=600;   /* both apps' phone layer: (max-width:600px) */
 
 /* ══ storage: IndexedDB holds every file fetched from the vault (keyed by path, stamped with Drive's modified time),
    the last state each app saved while offline, the glances and the note list ══ */
@@ -571,7 +577,14 @@ function shellBridge(KIND,INS){
   function goPage(pg,tries){var b=document.querySelector(KIND==='tt'?'.ph-tab[data-ph-tab="'+pg+'"]':'#phTabs .tab[data-v="'+pg+'"]');
     if(b&&b.getClientRects().length){if(curPage()!==pg)b.click();return;}
     if((tries||0)<30)setTimeout(function(){goPage(pg,(tries||0)+1);},150);}
+  /* resting = a screen the shell may swap out from under him without losing anything: Study Space's Overview with no panel
+     open, the timetable's Today tab with no sheet open and nothing being edited. A stale app (its code or a bank changed in
+     the vault) reloads the moment it rests here, instead of waiting for a trip to the home screen. */
+  var rsLast=null;
+  function resting(){try{if(KIND==='tt')return!!(typeof PH!=='undefined'&&PH.on&&PH.tab==='today'&&!PH.sheet&&!(typeof editingGuard==='function'&&editingGuard()));
+    return!!(typeof PH!=='undefined'&&PH.on&&typeof view!=='undefined'&&view&&view.name==='home'&&(typeof run==='undefined'||!run)&&!(typeof SFP!=='undefined'&&SFP.open)&&!document.body.classList.contains('sf-panel'));}catch(e){return false;}}
   function tbReport(){tbQ=0;var pg=curPage();if(pg&&pg!==pgLast){pgLast=pg;post({type:'shell-page',page:pg});}
+    var rs=resting();if(rs!==rsLast){rsLast=rs;post({type:'shell-rest',ok:rs});}
     var el=document.querySelector(TSEL),m=null;
     if(el){var r=el.getBoundingClientRect(),cs=getComputedStyle(el);
       if(r.height>0&&r.bottom>0&&cs.display!=='none'&&cs.visibility!=='hidden'){var ic=el.querySelector('svg'),ir=ic&&ic.getBoundingClientRect();
@@ -807,6 +820,7 @@ addEventListener('message',e=>{
   if(d.type==='shell-glance'){gotGlance(a,d.model);return;}
   if(d.type==='shell-tabbar'){W.tabbar=d.rect||null;if(mode==='app'&&APPS[idx]===a&&!sw)layoutSwipe();return;}
   if(d.type==='shell-page'){if(typeof d.page==='string'&&W.restored!==false){LAST.pages[a.id]=d.page;saveLast();}return;}
+  if(d.type==='shell-rest'){W.rest=!!d.ok;if(W.rest&&W.stale)restReload(W);return;}
   if(a.kind==='tt')ttMsg(W,a,d);else if(a.kind==='ss')ssMsg(W,a,d);
 });
 function ttMsg(W,a,d){
@@ -1205,7 +1219,7 @@ async function loadApp(a,{force=false}={}){
     if(miss.length){waitMsg(W,'Fetching from your vault');await fetchFiles(miss);}
     if(a.kind==='ss'){const again=await codePaths(a);const more=[];for(const p of again)if(!(await cached(p)))more.push(p);if(more.length)await fetchFiles(more);}
     await loadState(a);
-    W.ready=false;W.stale=false;W.f.srcdoc=await assemble(a);
+    W.ready=false;W.stale=false;W.rest=false;clearTimeout(W.rt);W.f.srcdoc=await assemble(a);
   }catch(e){
     console.warn('shell: could not open',a.id,e);
     waitMsg(W,e instanceof NetError?(navigator.onLine?'Couldn\'t reach the vault to fetch it ('+e.message+').':'Not on this phone yet, and there is no connection.'):'Could not load it: '+(e.message||e),true);
@@ -1222,7 +1236,11 @@ async function loadState(a){
   if(s.local)setTimeout(()=>flush(a.id),1500);
 }
 /* the app's code changed in the vault (a new semester, a new bank): reload it, but never under his fingers */
-function reloadSoon(a){const W=WIN[a.id];if(!W)return;if(mode==='app'&&APPS[idx]===a){W.stale=true;return;}loadApp(a);}
+function reloadSoon(a){const W=WIN[a.id];if(!W)return;if(mode==='app'&&APPS[idx]===a){W.stale=true;if(W.rest)restReload(W);return;}loadApp(a);}
+/* the open app is stale and resting (Overview / Today, see the bridge's resting()): reload it after a short settle, as long
+   as it is still resting and no shell gesture is in flight. Jaden rarely visits the home screen now that it is the
+   settings page, so this is how a new bank or lesson reaches him mid-session (Oct 2026). */
+function restReload(W){clearTimeout(W.rt);W.rt=setTimeout(()=>{if(W.stale&&W.rest&&!sw&&!gz)loadApp(W.app);},700);}
 
 /* ══ keeping current: one cheap stat call for every file in play, then fetch only what moved ══ */
 let revalT=0,lastNotes=0;
