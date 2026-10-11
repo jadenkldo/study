@@ -321,7 +321,7 @@ const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
-const SHELL_VERSION='v19',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v20',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -368,7 +368,9 @@ let canvasApp=null;
 function canvasFor(a){
   canvasApp=a||null;
   const r=document.documentElement.style;
-  if(a){r.setProperty('--canvas',look(a).bar||look(a).paper);r.setProperty('--capc',look(a).top||look(a).paper);}
+  /* wide frames (iPad) have no bottom tab bar: the band below takes the app's top colour, so top and bottom match */
+  const wide=viewBox().W>PHONE_MAX;
+  if(a){r.setProperty('--canvas',(wide?look(a).top:look(a).bar)||look(a).paper);r.setProperty('--capc',look(a).top||look(a).paper);}
   else{r.removeProperty('--canvas');r.removeProperty('--capc');}
 }
 applyTheme();applyMotion();
@@ -571,7 +573,8 @@ function shellBridge(KIND,INS){
      +'html.phone body:not(.inq) #main{padding-bottom:calc(var(--sa-b) + 92px)!important}')+'}';
   function insets(i){css.textContent=(KIND==='tt'
     ?'body.phone{--ph-sat:'+px(i.t)+';--ph-sab:'+px(i.b)+';--ph-sal:'+px(i.l)+';--ph-sar:'+px(i.r)+'}'
-    :'html.phone{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}')+TABS;setTimeout(tbReport,60);}
+    :'html.phone{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}'
+      +'#splitbtn{display:none!important}')+TABS;   /* Study Space's split button is Obsidian-only: the shell can't split a pane */setTimeout(tbReport,60);}
   /* where the tab bar is (or that it's hidden, as on Study Space's question screen), so the shell can lay its swipe zone over it */
   var TSEL=KIND==='tt'?'.ph-tabs':'#phTabs',tbLast='',tbQ=0,pgLast=null;
   /* the page he is on (the timetable's phone tab; Study Space's tab), so the phone reopens there next time */
@@ -1535,7 +1538,7 @@ document.addEventListener('keydown',e=>{
   if(mode!=='stack'||$('#sheet').classList.contains('open')||$('#setup').classList.contains('on'))return;
   if(e.key==='ArrowRight'||e.key==='ArrowLeft'){idx=Math.max(0,Math.min(APPS.length-1,idx+(e.key==='ArrowRight'?1:-1)));document.body.classList.add('anim');place();$(`.lab[data-i="${idx}"]`).focus({preventScroll:true});}
 });
-function onGeometry(){applyPads();if(!sw)place();layoutSwipe();Object.values(WIN).forEach(w=>pushInsets(w.app));}
+function onGeometry(){applyPads();if(canvasApp)canvasFor(canvasApp);if(!sw)place();layoutSwipe();Object.values(WIN).forEach(w=>pushInsets(w.app));}
 addEventListener('resize',onGeometry);addEventListener('orientationchange',()=>setTimeout(onGeometry,250));
 if(window.visualViewport)visualViewport.addEventListener('resize',onGeometry);
 applyPads();
