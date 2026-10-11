@@ -296,7 +296,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 <section id="setup" aria-labelledby="su-t">
   <main>
     <h1 id="su-t">Connect to your vault</h1>
-    <p class="lead">The phone reads your two study apps from Google Drive and saves your ticks back through the gatekeeper script. Paste its web app URL and key from the setup steps. Both stay on this phone.</p>
+    <p class="lead">The phone reads your study apps from Google Drive and saves your ticks back through the gatekeeper script. Paste its web app URL and key from the setup steps. Both stay on this phone.</p>
     <form id="su-f" novalidate>
       <div class="field"><label for="su-url">Gatekeeper URL</label>
         <input id="su-url" type="url" inputmode="url" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" required></div>
@@ -321,8 +321,8 @@ const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
-const PHONE_MAX=600;   /* both apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v24',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const PHONE_MAX=600;   /* the apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
+const SHELL_VERSION='v25',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -426,6 +426,8 @@ const DB={
 /* ══ the gatekeeper: JSON over a text/plain POST (no CORS preflight), every call carries the key ══ */
 const CFG_KEY='study-shell.gatekeeper';
 let GK=null;try{GK=JSON.parse(localStorage.getItem(CFG_KEY)||'null');}catch(e){}
+/* tests on the Mac only (the dev gatekeeper): ?gk=<url>&key=<key> connects without the setup screen; never on the public host */
+if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&P.get('gk')&&P.get('key')){GK={url:P.get('gk'),key:P.get('key')};try{localStorage.setItem(CFG_KEY,JSON.stringify(GK));}catch(e){}}
 /* Three kinds of failure, kept apart because they mean different things to Jaden:
    NetError  — no answer: the request dropped, timed out, or Google sent an error page instead of data
    Suspended — the phone hid the app mid-request (iOS cuts those off): NOT an error, the request is simply not sent yet
@@ -562,7 +564,7 @@ function shellBridge(KIND,INS){
      the same 12/14px label, so swiping from one app to the other lines up exactly. Each keeps its own colours and its
      own active-tab mark. Landscape keeps the apps' own compact bars. */
   var LABEL="font-family:'DM Sans',system-ui,-apple-system,sans-serif!important;font-size:12px!important;line-height:14px!important;";
-  var TABS='@media not all and (orientation:landscape) and (max-height:520px){'+(KIND==='tt'
+  var TABS=KIND==='cp'?'':'@media not all and (orientation:landscape) and (max-height:520px){'+(KIND==='tt'
     ?'body.phone{--ph-tabh:60px!important}body.phone .ph-tabs{box-sizing:border-box!important;height:calc(60px + var(--ph-sab))!important}'
      +'body.phone .ph-tab{box-sizing:border-box!important;height:100%!important;min-height:0!important;justify-content:flex-start!important;padding:7px 0 0!important;gap:2px!important}'
      +'body.phone .ph-tab .ph-tic{height:28px!important}body.phone .ph-tab svg{width:22px!important;height:22px!important}body.phone .ph-tab span.l{'+LABEL+'}'
@@ -573,21 +575,23 @@ function shellBridge(KIND,INS){
      +'html.phone body:not(.inq) #main{padding-bottom:calc(var(--sa-b) + 92px)!important}')+'}';
   function insets(i){css.textContent=(KIND==='tt'
     ?'body.phone{--ph-sat:'+px(i.t)+';--ph-sab:'+px(i.b)+';--ph-sal:'+px(i.l)+';--ph-sar:'+px(i.r)+'}'
+    :KIND==='cp'?'html{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}'
     :'html.phone{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}'
       +'#splitbtn,#askbtn{display:none!important}')+TABS;   /* Obsidian-only controls the shell can't answer, at every width: split a pane (ss-split) and Explain further (ss-ask) */setTimeout(tbReport,60);}
   /* where the tab bar is (or that it's hidden, as on Study Space's question screen), so the shell can lay its swipe zone over it */
-  var TSEL=KIND==='tt'?'.ph-tabs':'#phTabs',tbLast='',tbQ=0,pgLast=null;
+  var TSEL=KIND==='tt'?'.ph-tabs':KIND==='ss'?'#phTabs':'#no-tab-bar',tbLast='',tbQ=0,pgLast=null;
   /* the page he is on (the timetable's phone tab; Study Space's tab), so the phone reopens there next time */
-  function curPage(){try{if(KIND==='tt')return(typeof PH!=='undefined'&&PH.on&&PH.tab)||null;
+  function curPage(){try{if(KIND==='cp')return null;if(KIND==='tt')return(typeof PH!=='undefined'&&PH.on&&PH.tab)||null;
     var t=document.querySelector('#phTabs .tab[aria-current="page"]');return t?t.dataset.v:null;}catch(e){return null;}}
-  function goPage(pg,tries){var b=document.querySelector(KIND==='tt'?'.ph-tab[data-ph-tab="'+pg+'"]':'#phTabs .tab[data-v="'+pg+'"]');
+  function goPage(pg,tries){if(KIND==='cp')return;var b=document.querySelector(KIND==='tt'?'.ph-tab[data-ph-tab="'+pg+'"]':'#phTabs .tab[data-v="'+pg+'"]');
     if(b&&b.getClientRects().length){if(curPage()!==pg)b.click();return;}
     if((tries||0)<30)setTimeout(function(){goPage(pg,(tries||0)+1);},150);}
   /* resting = a screen the shell may swap out from under him without losing anything: Study Space's Overview with no panel
      open, the timetable's Today tab with no sheet open and nothing being edited. A stale app (its code or a bank changed in
      the vault) reloads the moment it rests here, instead of waiting for a trip to the home screen. */
   var rsLast=null;
-  function resting(){try{if(KIND==='tt')return!!(typeof PH!=='undefined'&&PH.on&&PH.tab==='today'&&!PH.sheet&&!(typeof editingGuard==='function'&&editingGuard()));
+  function resting(){try{if(KIND==='cp'){var hb=document.getElementById('hub'),q=document.getElementById('q');return!!(hb&&!hb.hidden&&!(q&&q.value));}
+    if(KIND==='tt')return!!(typeof PH!=='undefined'&&PH.on&&PH.tab==='today'&&!PH.sheet&&!(typeof editingGuard==='function'&&editingGuard()));
     return!!(typeof PH!=='undefined'&&PH.on&&typeof view!=='undefined'&&view&&view.name==='home'&&(typeof run==='undefined'||!run)&&!(typeof SFP!=='undefined'&&SFP.open)&&!document.body.classList.contains('sf-panel'));}catch(e){return false;}}
   function tbReport(){tbQ=0;var pg=curPage();if(pg&&pg!==pgLast){pgLast=pg;post({type:'shell-page',page:pg});}
     var rs=resting();if(rs!==rsLast){rsLast=rs;post({type:'shell-rest',ok:rs});}
@@ -664,7 +668,7 @@ function shellBridge(KIND,INS){
     if(d.type==='shell-insets')insets(d);
     else if(d.type==='shell-ptr')ptr(d);
     else if(d.type==='shell-goto'&&typeof d.page==='string')goPage(d.page,0);
-    else if(d.type==='shell-glance?'){var g=null;try{g=KIND==='tt'?ttGlance():ssGlance();}catch(err){g={error:String(err&&err.message||err)};}post({type:'shell-glance',model:g});}
+    else if(d.type==='shell-glance?'){var g=null;try{g=KIND==='tt'?ttGlance():KIND==='ss'?ssGlance():null;}catch(err){g={error:String(err&&err.message||err)};}post({type:'shell-glance',model:g});}
   });
   var d0=1,on=false;
   function dist(t){return Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);}
@@ -818,7 +822,7 @@ function restorePage(W){
   else W.restored=true;
 }
 function setLast(a){if(a&&LAST.app!==a.id){LAST.app=a.id;saveLast();}}
-function themeMsgs(a){return a.kind==='tt'?[{type:'tt-theme',theme:isDark()?'dark':'light'}]:a.kind==='ss'?[{type:'ss-theme',dark:isDark(),accent:null}]:[];}
+function themeMsgs(a){return a.kind==='tt'?[{type:'tt-theme',theme:isDark()?'dark':'light'}]:a.kind==='ss'?[{type:'ss-theme',dark:isDark(),accent:null}]:a.kind==='cp'?[{type:'cp-theme',dark:isDark()}]:[];}
 addEventListener('message',e=>{
   const W=Object.values(WIN).find(w=>w.f.contentWindow===e.source);if(!W)return;
   const d=e.data;if(!d||typeof d!=='object'||typeof d.type!=='string')return;
@@ -829,7 +833,7 @@ addEventListener('message',e=>{
   if(d.type==='shell-tabbar'){W.tabbar=d.rect||null;if(mode==='app'&&APPS[idx]===a&&!sw)layoutSwipe();return;}
   if(d.type==='shell-page'){if(typeof d.page==='string'&&W.restored!==false){LAST.pages[a.id]=d.page;saveLast();}return;}
   if(d.type==='shell-rest'){W.rest=!!d.ok;if(W.rest&&W.stale)restReload(W);return;}
-  if(a.kind==='tt')ttMsg(W,a,d);else if(a.kind==='ss')ssMsg(W,a,d);
+  if(a.kind==='tt')ttMsg(W,a,d);else if(a.kind==='ss')ssMsg(W,a,d);else if(a.kind==='cp')cpMsg(W,a,d);
 });
 function ttMsg(W,a,d){
   if(d.type==='tt-ready'){W.ready=true;restorePage(W);post(W,{type:'tt-init',state:stateOf(a.id)});themeMsgs(a).forEach(m=>post(W,m));if(NOTES)post(W,{type:'tt-notes',notes:NOTES});wantGlance(a.id,1200);}
@@ -838,7 +842,7 @@ function ttMsg(W,a,d){
   /* tt-summary feeds the desktop's course-page to-do and notifications: nothing to do on the phone */
 }
 function ssMsg(W,a,d){
-  if(d.type==='ss-ready'){W.ready=true;restorePage(W);post(W,{type:'ss-init',state:stateOf(a.id)});themeMsgs(a).forEach(m=>post(W,m));sendDue(a);wantGlance(a.id,1200);}
+  if(d.type==='ss-ready'){W.ready=true;restorePage(W);post(W,{type:'ss-init',state:withSubject(stateOf(a.id),W.wantSubject)});W.wantSubject=null;themeMsgs(a).forEach(m=>post(W,m));sendDue(a);wantGlance(a.id,1200);}
   else if(d.type==='ss-save')onAppSave(a,d.state);
   else if(d.type==='ss-open'&&typeof d.path==='string')openPath(d.path);
   else if(d.type==='ss-want-logs'&&Array.isArray(d.files)){W.logFiles=d.files.filter(f=>typeof f==='string'&&f.endsWith('.md'));sendLogs(a);}
@@ -847,6 +851,62 @@ function ssMsg(W,a,d){
   else if(d.type==='ss-want-slice'&&typeof d.note==='string'&&typeof d.heading==='string')sendSlice(a,d);
   else if(d.type==='ss-want-fig'&&typeof d.path==='string')sendFig(a,d.path);
   /* ss-split, ss-ask, ss-hotkey, ss-sel belong to the desktop (split panes, Ask Claude): ignored here, as is anything unknown */
+}
+
+/* ══ the course page: every unit's page data and the note search index come prebuilt from the course-page plugin
+   (system/course-page/phone-data.json, apps.json "data"), so the phone never scans the vault. The page keeps the hub
+   itself; the shell only feeds it and opens what it asks for. ══ */
+const CP={};   /* per app id: {units, data, index, unit (the one open, or null), folds} */
+async function cpLoad(a,{force=false}={}){
+  const c=CP[a.id]=CP[a.id]||{unit:null,folds:null};
+  if(c.units&&!force)return c;
+  let e=await cached(a.data);
+  if(!e){if(!GK)throw new GateError('not connected');e=(await fetchFiles([a.data]))[a.data];}
+  if(!e||e.text==null)throw new GateError((e&&e.error)||'missing: '+a.data);
+  const j=JSON.parse(e.text);c.units=j.units||[];c.data=j.data||{};c.index=j.index||[];
+  if(!c.folds)c.folds=(await DB.get('kv','cp-folds'))||{};
+  return c;
+}
+const cpData=(c,unit)=>c.data[unit]?Object.assign({},c.data[unit],{folds:c.folds[unit]||{}}):null;
+/* everything the page needs, in the order it expects: the units (it opens on the hub), the index, then the open unit */
+async function cpSend(a){
+  const W=WIN[a.id];if(!W||!W.ready)return;
+  let c;try{c=await cpLoad(a);}
+  catch(e){console.warn('shell: course data',e);toast(e instanceof NetError?'The course pages need a connection the first time.':'The course data file is not in the vault yet. Open Obsidian on the Mac once.');return;}
+  post(W,{type:'cp-units',units:c.units});post(W,{type:'cp-index',notes:c.index});
+  if(c.unit){const d=cpData(c,c.unit);if(d)post(W,{type:'cp-data',data:d});else c.unit=null;}
+}
+function cpMsg(W,a,d){
+  const c=CP[a.id]=CP[a.id]||{unit:null,folds:null};
+  if(d.type==='cp-ready'){W.ready=true;W.restored=true;themeMsgs(a).forEach(m=>post(W,m));
+    c.unit=PREF.openTo==='last'&&typeof LAST.pages[a.id]==='string'&&LAST.pages[a.id]||null;   /* back to the unit he left */
+    cpSend(a);}
+  else if(d.type==='cp-want'&&typeof d.unit==='string'){
+    cpLoad(a).then(cc=>{const x=cpData(cc,d.unit);if(x){cc.unit=d.unit;post(W,{type:'cp-data',data:x});}else toast('No course page for '+d.unit);})
+      .catch(e=>toast(e instanceof NetError?'No connection to fetch '+d.unit:'Could not load '+d.unit));}
+  else if(d.type==='cp-page'){c.unit=typeof d.unit==='string'?d.unit:null;LAST.pages[a.id]=c.unit||'';saveLast();}
+  else if(d.type==='cp-open'&&typeof d.path==='string')cpOpen(d.path);
+  else if(d.type==='cp-studyspace')openStudySpace(typeof d.unit==='string'?d.unit:'');
+  else if(d.type==='cp-fold'&&typeof d.unit==='string'&&typeof d.tier==='string'){c.folds=c.folds||{};(c.folds[d.unit]=c.folds[d.unit]||{})[d.tier]=!!d.open;DB.put('kv','cp-folds',c.folds);}
+}
+/* cp-open: the course page sends exact vault paths (a note, a GoodNotes or sources PDF, with an optional #heading), so
+   nothing to resolve; the note index does not list sources/, which is why this does not go through openPath() */
+function cpOpen(raw){
+  const s=String(raw||''),h=s.indexOf('#'),lp=h<0?s:s.slice(0,h),sub=h<0?'':s.slice(h+1);
+  if(/\.pdf$/i.test(lp))return showPdf(lp+(sub?'#'+sub:''),null);
+  if(/\.md$/i.test(lp))return showNote(lp,sub);
+  return openPath(raw);
+}
+/* cp-studyspace: the study-space plugin's activate(unit), here: step into Study Space on that subject. The app takes a
+   subject from an incoming settings.subject on init, the same way it takes one from a sync */
+const withSubject=(st,unit)=>unit?Object.assign({},st||{},{settings:Object.assign({},(st||{}).settings||{},{subject:unit})}):st;
+function openStudySpace(unit){
+  const ss=APPS.find(x=>x.kind==='ss');if(!ss){toast('Study Space is not on this phone');return;}
+  if(mode!=='app'||APPS[idx]!==ss)openApp(APPS.indexOf(ss));
+  const W=WIN[ss.id];if(!W||!unit)return;
+  if(!W.ready){W.wantSubject=unit;return;}
+  const st=stateOf(ss.id);
+  if(!st||!st.settings||String(st.settings.subject||'').split(/[·|]/)[0].trim().toLowerCase()!==unit.toLowerCase())post(W,{type:'ss-init',state:withSubject(st,unit)});
 }
 
 /* READ-ONLY view of the study timetable for Study Space's "what is due next" line: the study-space plugin's
@@ -1140,13 +1200,14 @@ async function renderMath(el){
 /* a GoodNotes PDF stays in Drive: the sheet offers a real tap to open it there (iOS only opens a new page from a tap) */
 async function showPdf(path,notePath,title,sub){
   SH.hist.push(()=>showPdf(path,notePath,title,sub));
-  sheetOpen(title||path.split('/').pop().replace(/\.pdf$/i,''),sub||'Annotated slides');
+  const gn=path.startsWith('goodnotes/');
+  sheetOpen(title||path.split('/').pop().replace(/\.pdf$/i,''),sub||(gn?'Annotated slides':'PDF'));
   sheetBody(`<p class="sheet-lead">Opening the link</p>`);
   let link=null,err='';
   try{const c=await cached(path);if(c&&c.link)link=c.link;else{const r=await api('read',{path});link=r.link;await remember({path,modified:r.modified,mime:r.mime,link});}}
   catch(e){err=e instanceof NetError?'There is no connection, so the PDF cannot be opened right now.':'Could not find this PDF in Drive.';}
   const page=(path.match(/#page=(\d+)/)||[])[1];
-  sheetBody(`<p class="sheet-lead">${link?`Your annotated slides open in Google Drive${page?`. Go to page ${esc(page)}`:''}.`:esc(err)}</p>
+  sheetBody(`<p class="sheet-lead">${link?`${gn?'Your annotated slides open':'This PDF opens'} in Google Drive${page?`. Go to page ${esc(page)}`:''}.`:esc(err)}</p>
     <div class="acts">${link?`<a class="btn mark" href="${esc(link)}" target="_blank" rel="noopener">${svg('ext')}Open in Google Drive</a>`:''}
     ${notePath?`<button class="btn quiet" type="button" id="sh-note">${svg('note')}Read the written note</button>`:''}</div>`);
   const nb=$('#sh-note');if(nb)nb.addEventListener('click',()=>showNote(notePath));
@@ -1224,7 +1285,7 @@ function pushInsets(a){const W=WIN[a.id];if(W&&W.f.srcdoc)post(W,Object.assign({
 async function loadApp(a,{force=false}={}){
   const W=ensureWin(a);
   try{
-    const paths=await codePaths(a),miss=[];
+    const paths=[...await codePaths(a),...(a.data?[a.data]:[])],miss=[];
     for(const p of paths)if(force||!(await cached(p)))miss.push(p);
     if(miss.length){waitMsg(W,'Fetching from your vault');await fetchFiles(miss);}
     if(a.kind==='ss'){const again=await codePaths(a);const more=[];for(const p of again)if(!(await cached(p)))more.push(p);if(more.length)await fetchFiles(more);}
@@ -1261,7 +1322,8 @@ async function revalidate(){
   try{
     const codeBy={};for(const a of APPS)codeBy[a.id]=await codePaths(a,{fetchMissing:false});
     const logs=[...new Set(Object.values(WIN).flatMap(w=>w.logFiles||[]))];
-    const paths=[...new Set([...Object.values(codeBy).flat(),...APPS.map(a=>a.state).filter(Boolean),...logs])];
+    const datas=APPS.map(a=>a.data).filter(Boolean);
+    const paths=[...new Set([...Object.values(codeBy).flat(),...APPS.map(a=>a.state).filter(Boolean),...logs,...datas])];
     const r=await api('stat',{paths});lastSync=Date.now();
     const changed=[];
     for(const p of paths){const m=r.modified[p];if(!m)continue;const c=await cached(p);if(!c||c.modified!==m)changed.push(p);}
@@ -1273,12 +1335,14 @@ async function revalidate(){
           if(canon(st)!==s.appCanon)pushState(a,st);}catch(e){}}}
       }
     }
-    const code=changed.filter(p=>!APPS.some(a=>a.state===p)&&!logs.includes(p));
+    const code=changed.filter(p=>!APPS.some(a=>a.state===p)&&!logs.includes(p)&&!datas.includes(p));
     if(code.length){
       await fetchFiles(code);
       for(const a of APPS){if(code.some(p=>codeBy[a.id].includes(p))){reloadSoon(a);}}
       if(APPS.some(a=>a.kind==='tt'&&code.includes(a.file)))APPS.filter(b=>b.kind==='ss').forEach(b=>sendDue(b));
     }
+    const dchanged=datas.filter(p=>changed.includes(p));
+    if(dchanged.length){await fetchFiles(dchanged);for(const a of APPS){if(a.data&&dchanged.includes(a.data)){try{await cpLoad(a,{force:true});}catch(e){}cpSend(a);}}}
     const lchanged=logs.filter(p=>changed.includes(p));
     if(lchanged.length){await fetchFiles(lchanged);APPS.filter(b=>b.kind==='ss').forEach(b=>sendLogs(b));}
     if(Date.now()-lastNotes>3*60e3)await refreshNotes();
@@ -1573,11 +1637,11 @@ $('#su-f').addEventListener('submit',async e=>{
   $('#setup').classList.remove('on','busy');syncLine();
   if(!booted)start();
 });
-/* the first time: everything both apps need comes down once, then lives on the phone */
+/* the first time: everything the apps need comes down once, then lives on the phone */
 async function firstFetch(){
   const bar=$('#su-bar'),txt=$('#su-p');
   try{
-    const all=[];for(const a of APPS){all.push(...await codePaths(a));if(a.state)all.push(a.state);}
+    const all=[];for(const a of APPS){all.push(...await codePaths(a));if(a.state)all.push(a.state);if(a.data)all.push(a.data);}
     const paths=[...new Set(all)];let n=0;
     txt.textContent='Fetching your apps from Drive';
     await fetchFiles(paths,()=>{n++;bar.style.transform=`scaleX(${n/paths.length})`;});
@@ -1627,7 +1691,7 @@ function openSettings(){
   sheetBody(`<div class="set" id="set">
   <h3 class="hv">Status<span class="vtag num" aria-label="Shell version ${SHELL_VERSION}">${SHELL_VERSION}</span></h3><div class="rowinfo" id="set-status">${statusRows()}</div>
   <h3>Sync</h3><div class="acts"><button class="btn quiet" type="button" id="cx-sync">Sync now</button>
-    <button class="btn quiet" type="button" id="cx-reload">Reload both apps</button>
+    <button class="btn quiet" type="button" id="cx-reload">Reload the apps</button>
     <a class="btn quiet" id="cx-diag" href="diag.html">Screen check</a></div>
   <h3>Start-up</h3><p class="lbl">Open to</p>${seg('openTo',PREF.openTo,[['last','Last page'],['tt','Timetable']])}
     <p class="note">${PREF.openTo==='last'?'The app and page you were last on.':'The Timetable, on Today.'}</p>
