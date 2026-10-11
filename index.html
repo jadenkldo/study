@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -322,7 +322,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* both apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v22',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v23',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
