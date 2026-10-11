@@ -82,8 +82,9 @@ h1,h2,h3,.serif{font-family:var(--font-display);font-weight:600;letter-spacing:-
 body.stack #cap,body.gz #cap{display:none;}
 .win{position:absolute;inset:0;visibility:hidden;pointer-events:none;overflow:hidden;background:var(--wp);}
 .win.on{visibility:visible;pointer-events:auto;}
-/* wide frames (iPad): the apps' desktop layouts take no insets, so the frame itself sits clear of the cap and the bottom inset */
-.win iframe{position:absolute;top:var(--ft,0px);bottom:var(--fb,0px);left:var(--fl,0px);right:var(--fr,0px);width:auto;height:auto;border:0;display:block;background:var(--wp);}
+/* wide frames (iPad): the apps' desktop layouts take no insets, so the frame itself sits clear of the cap and the bottom inset.
+   An iframe is a replaced element: top+bottom alone won't stretch it (it falls back to 300x150), so the size is explicit */
+.win iframe{position:absolute;top:var(--ft,0px);bottom:var(--fb,0px);left:var(--fl,0px);right:var(--fr,0px);width:calc(100% - var(--fl,0px) - var(--fr,0px));height:calc(100% - var(--ft,0px) - var(--fb,0px));border:0;display:block;background:var(--wp);}
 .win .wait{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;padding:40px;text-align:center;color:var(--wm);font-size:17px;line-height:1.4;}
 .win .wait b{font:600 30px/1.15 var(--font-display);letter-spacing:-.015em;color:var(--wi);}
 .win .wait button{margin-top:10px;min-height:48px;padding:0 22px;border-radius:10px;border:1px solid var(--wl);color:var(--wi);font-weight:600;pointer-events:auto;}
@@ -318,7 +319,7 @@ const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
-const SHELL_VERSION='v15',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v16',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
