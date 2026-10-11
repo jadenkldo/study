@@ -321,7 +321,7 @@ const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
-const SHELL_VERSION='v20',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v21',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -574,7 +574,7 @@ function shellBridge(KIND,INS){
   function insets(i){css.textContent=(KIND==='tt'
     ?'body.phone{--ph-sat:'+px(i.t)+';--ph-sab:'+px(i.b)+';--ph-sal:'+px(i.l)+';--ph-sar:'+px(i.r)+'}'
     :'html.phone{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}'
-      +'#splitbtn{display:none!important}')+TABS;   /* Study Space's split button is Obsidian-only: the shell can't split a pane */setTimeout(tbReport,60);}
+      +'#splitbtn,#askbtn{display:none!important}')+TABS;   /* Obsidian-only controls the shell can't answer, at every width: split a pane (ss-split) and Explain further (ss-ask) */setTimeout(tbReport,60);}
   /* where the tab bar is (or that it's hidden, as on Study Space's question screen), so the shell can lay its swipe zone over it */
   var TSEL=KIND==='tt'?'.ph-tabs':'#phTabs',tbLast='',tbQ=0,pgLast=null;
   /* the page he is on (the timetable's phone tab; Study Space's tab), so the phone reopens there next time */
