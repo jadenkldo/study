@@ -321,7 +321,8 @@ const P=new URLSearchParams(location.search);
 const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-reduced-motion: reduce)');
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
-const SHELL_VERSION='v21',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const PHONE_MAX=600;   /* both apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
+const SHELL_VERSION='v22',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -405,7 +406,6 @@ function applyPads(){const r=document.documentElement.style,st=osStrips();r.setP
   const i=insets(),wide=viewBox().W>PHONE_MAX;
   r.setProperty('--ft',(wide?Math.max(capH(),i.t):0)+'px');r.setProperty('--fb',(wide&&!st?i.b:0)+'px');
   r.setProperty('--fl',(wide?i.l:0)+'px');r.setProperty('--fr',(wide?i.r:0)+'px');}
-const PHONE_MAX=600;   /* both apps' phone layer: (max-width:600px) */
 
 /* ══ storage: IndexedDB holds every file fetched from the vault (keyed by path, stamped with Drive's modified time),
    the last state each app saved while offline, the glances and the note list ══ */
