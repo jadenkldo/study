@@ -322,7 +322,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* the apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v25',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v26',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -572,7 +572,7 @@ function shellBridge(KIND,INS){
      +'html.phone #phTabs .tab{box-sizing:border-box!important;height:100%!important;min-height:0!important;justify-content:flex-start!important;padding:7px 2px 0!important;gap:2px!important}'
      +'html.phone #phTabs .tab>.mico{display:grid!important;place-items:center!important;height:28px!important;flex:none!important}'
      +'html.phone #phTabs .tab>.mico svg{width:22px!important;height:22px!important}html.phone #phTabs .tab>span:not(.bd):not(.mico){'+LABEL+'}'
-     +'html.phone body:not(.inq) #main{padding-bottom:calc(var(--sa-b) + 92px)!important}')+'}';
+     +'html.phone body:not(.inq):not(.inlesson) #main{padding-bottom:calc(var(--sa-b) + 92px)!important}')+'}';
   function insets(i){css.textContent=(KIND==='tt'
     ?'body.phone{--ph-sat:'+px(i.t)+';--ph-sab:'+px(i.b)+';--ph-sal:'+px(i.l)+';--ph-sar:'+px(i.r)+'}'
     :KIND==='cp'?'html{--sa-t:'+px(i.t)+';--sa-b:'+px(i.b)+';--sa-l:'+px(i.l)+';--sa-r:'+px(i.r)+'}'
