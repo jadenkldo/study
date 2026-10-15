@@ -322,7 +322,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* the apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v26',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v27',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -597,7 +597,9 @@ function shellBridge(KIND,INS){
     var rs=resting();if(rs!==rsLast){rsLast=rs;post({type:'shell-rest',ok:rs});}
     var el=document.querySelector(TSEL),m=null;
     if(el){var r=el.getBoundingClientRect(),cs=getComputedStyle(el);
-      if(r.height>0&&r.bottom>0&&cs.display!=='none'&&cs.visibility!=='hidden'){var ic=el.querySelector('svg'),ir=ic&&ic.getBoundingClientRect();
+      /* covered (the timetable's editor sheet, a dialog) counts as hidden: no swipe zone, no hint chevron over the sheet */
+      var top=r.height>0&&document.elementFromPoint(r.left+r.width/2,(r.top+r.bottom)/2);
+      if(r.height>0&&r.bottom>0&&cs.display!=='none'&&cs.visibility!=='hidden'&&top&&el.contains(top)){var ic=el.querySelector('svg'),ir=ic&&ic.getBoundingClientRect();
         m={top:r.top,bottom:r.bottom,iconY:ir?ir.top+ir.height/2:r.top+r.height/2};}}
     var k=JSON.stringify(m);if(k!==tbLast){tbLast=k;post({type:'shell-tabbar',rect:m});}}
   function tbSoon(){if(!tbQ)tbQ=requestAnimationFrame(tbReport);}
