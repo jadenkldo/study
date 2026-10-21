@@ -322,7 +322,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* the apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v27',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v28',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -954,7 +954,7 @@ async function sendDue(a){
   const W=WIN[a.id];if(!W||!W.ready)return;
   const tt=APPS.find(x=>x.kind==='tt');if(!tt)return;
   try{const html=(await cached(tt.file)||{}).text;if(!html)return;
-    DUE=ttAssessments(html,stateOf(tt.id));post(W,{type:'ss-due',items:DUE});}
+    const st=stateOf(tt.id);DUE=ttAssessments(html,st);post(W,{type:'ss-due',items:DUE,needs:(st&&st.marksOut)||{}});}   /* needs: the Marks view's marksOut */
   catch(e){console.error('shell: could not read the timetable',e);}
 }
 async function sendLogs(a){
