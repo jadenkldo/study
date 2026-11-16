@@ -322,7 +322,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* the apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v28',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v29',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -640,7 +640,7 @@ function shellBridge(KIND,INS){
     var subs=window.QB.map(function(b){
       var ids={},due=0,known=0;(b.questions||[]).forEach(function(q){ids[q.id]=1;var r=srs[q.id];if(!r||!r.reps)return;if(r.box>=3)known++;if(now>=r.due)due++;});
       var col=b.meta&&b.meta.colour;
-      return{title:b.meta.title,light:col&&col.light&&col.light[0],dark:col&&col.dark&&col.dark[0],due:due,known:known,total:(b.questions||[]).length,
+      return{title:b.meta.title,name:(typeof subjName==='function'?subjName(b):b.meta.title),light:col&&col.light&&col.light[0],dark:col&&col.dark&&col.dark[0],due:due,known:known,total:(b.questions||[]).length,
         today:att.filter(function(a){return ids[a.qid]&&new Date(a.ts).toDateString()===day;}).length};
     });
     var active=(S.settings&&S.settings.subject)||'';
@@ -1259,7 +1259,7 @@ function line(a){
       s+=`<span class="g num"><span class="cw" style="--c:${esc(colOf(n)||'currentColor')}">${esc(n.short)}</span> ${esc(n.label)} <span class="${dueCls(diff)}">${fmtCountdown(diff)}</span></span>`;}
     return s;
   }
-  if(a.glance==='ss')return(m.subs||[]).slice(0,2).map(s=>`<span class="g num"><i class="dot" style="--c:${esc(colOf(s)||'currentColor')}"></i> ${esc(s.title)} <span class="${s.due?'':'mut'}">${s.due?s.due+' to drill':'none due'}</span></span>`).join('');
+  if(a.glance==='ss')return(m.subs||[]).slice(0,2).map(s=>`<span class="g num"><i class="dot" style="--c:${esc(colOf(s)||'currentColor')}"></i> ${esc(s.name||s.title)} <span class="${s.due?'':'mut'}">${s.due?s.due+' to drill':'none due'}</span></span>`).join('');
   return'';
 }
 function renderHead(){}   /* home no longer shows the date; kept so callers stay simple */
