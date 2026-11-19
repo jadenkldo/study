@@ -170,6 +170,15 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
 .ib:active{background:var(--surface-dim);color:var(--text);}
 #sheet .body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:22px calc(20px + var(--sar)) calc(var(--pb,var(--sab)) + 48px) calc(20px + var(--sal));}
 #sheet .body:focus{outline:none;}
+/* the PDF viewer: the sheet's body scrolls both ways; each page is a white leaf sized by pdfLayout() */
+#sheet .body.pdf{position:relative;padding:0;overflow:auto;background:var(--surface-dim);touch-action:pan-x pan-y;}
+.pdfv{display:flex;flex-direction:column;align-items:center;gap:10px;width:max-content;min-width:100%;box-sizing:border-box;
+  padding:10px calc(10px + var(--sar)) calc(var(--pb,var(--sab)) + 28px) calc(10px + var(--sal));}
+.pdfv .pg{flex:none;background:#fff;border-radius:3px;box-shadow:0 0 0 1px var(--border);overflow:hidden;}
+.pdfv .pg canvas{display:block;width:100%;height:100%;}
+.pdfbar{max-width:220px;height:3px;margin:0 auto;border-radius:2px;background:var(--border);overflow:hidden;}
+.pdfbar i{display:block;height:100%;width:0;background:var(--text2);transition:width .3s linear;}
+#sh-acts{display:flex;flex:none;}
 .md{max-width:65ch;margin:0 auto;font-size:16px;line-height:1.6;overflow-wrap:break-word;}
 .md>*+*{margin-top:.8em;}
 .md h1,.md h2,.md h3,.md h4,.md h5,.md h6{margin-top:1.6em;margin-bottom:-.2em;scroll-margin-top:16px;}
@@ -288,6 +297,7 @@ body:not(.stack) #status{opacity:0;pointer-events:none;}
   <header>
     <button class="ib" id="sh-back" type="button" aria-label="Back" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
     <h2 id="sh-t"></h2>
+    <span id="sh-acts"></span>
     <button class="ib" id="sh-x" type="button" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </header>
   <div class="body" id="sh-b" tabindex="-1"></div>
@@ -322,7 +332,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* the apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v29',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v30',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -1128,6 +1138,7 @@ const SH={hist:[],urls:[]};
 let lastFocus=null;
 function sheetOpen(title,sub){
   const s=$('#sheet');
+  PDF.token=null;pdfClose();$('#sh-acts').innerHTML='';
   $('#sh-t').innerHTML=esc(title)+(sub?`<small>${esc(sub)}</small>`:'');
   if(!s.classList.contains('open')){lastFocus=document.activeElement;s.classList.add('open');s.setAttribute('aria-hidden','false');$('#swz').style.visibility='hidden';}
   $('#sh-back').hidden=SH.hist.length<2;
@@ -1136,7 +1147,8 @@ function sheetOpen(title,sub){
 function sheetClose(){
   const s=$('#sheet');if(!s.classList.contains('open'))return;
   s.classList.remove('open');s.setAttribute('aria-hidden','true');$('#swz').style.visibility='';
-  SH.hist=[];setTimeout(()=>{if(!s.classList.contains('open')){$('#sh-b').innerHTML='';SH.urls.forEach(u=>URL.revokeObjectURL(u));SH.urls=[];}},500);
+  PDF.token=null;
+  SH.hist=[];setTimeout(()=>{if(!s.classList.contains('open')){pdfClose();$('#sh-acts').innerHTML='';$('#sh-b').innerHTML='';SH.urls.forEach(u=>URL.revokeObjectURL(u));SH.urls=[];}},500);
   const W=mode==='app'&&WIN[APPS[idx]&&APPS[idx].id];
   if(W)try{W.f.focus();}catch(e){}else if(lastFocus&&lastFocus.focus)lastFocus.focus();
 }
@@ -1199,20 +1211,160 @@ async function renderMath(el){
     window.renderMathInElement&&window.renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],throwOnError:false});
   }catch(e){}
 }
-/* a GoodNotes PDF stays in Drive: the sheet offers a real tap to open it there (iOS only opens a new page from a tap) */
+/* ── PDFs open inside the sheet (20 Nov 2026) ──
+   The bytes come down through the gatekeeper in pieces (read by offset), are kept in IndexedDB under 'pdf:<path>' and drawn by
+   pdf.js (vendor/pdfjs). A kept copy opens at once, offline too; Drive's modified time is checked behind it and a changed
+   file (a new GoodNotes backup) replaces it. If the bytes cannot be had (no connection and no copy, an older gatekeeper, a
+   file pdf.js cannot draw) the sheet falls back to the Drive link, which is also the icon in the header.
+   Layout (pdfLayout): a landscape page (slides) is fitted whole into the screen, a portrait page to its width, both again on
+   every rotation or resize. Pinch or double-tap zooms; only the pages near the screen hold a canvas. */
+const PDF={lib:null,cur:null,KEEP_MB:300,KEEP_N:40,KEEP_DAYS:30};
+async function pdfLib(){
+  if(!PDF.lib){PDF.lib=import('./vendor/pdfjs/pdf.min.mjs').then(m=>{m.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.mjs';return m;});PDF.lib.catch(()=>{PDF.lib=null;});}
+  return PDF.lib;
+}
+/* what is kept: kv 'pdf-lru' lists the kept PDFs, least recently opened first. A PDF leaves the phone when it has not been
+   opened for KEEP_DAYS, or when the kept ones pass KEEP_N files or KEEP_MB (the longest-unopened go first). Settings shows
+   the count and size and can remove them all */
+async function pdfNote(e){
+  let l=((await DB.get('kv','pdf-lru'))||[]).filter(x=>x.path!==e.path);
+  if(e.size!=null)l.push({path:e.path,size:e.size,at:Date.now()});
+  const old=Date.now()-PDF.KEEP_DAYS*864e5,drop=l.filter(x=>x.at<old);l=l.filter(x=>x.at>=old);
+  let tot=l.reduce((a,x)=>a+(x.size||0),0);
+  while(l.length>1&&(l.length>PDF.KEEP_N||tot>PDF.KEEP_MB*1048576)){const o=l.shift();tot-=o.size||0;drop.push(o);}
+  for(const o of drop)await DB.del('files','pdf:'+o.path);
+  await DB.put('kv','pdf-lru',l);return l;
+}
+async function pdfKeep(e){await DB.put('files','pdf:'+e.path,e);await pdfNote(e);}
+async function pdfKept(){const l=(await DB.get('kv','pdf-lru'))||[];return{n:l.length,mb:l.reduce((a,x)=>a+(x.size||0),0)/1048576};}
+async function pdfForget(){const l=(await DB.get('kv','pdf-lru'))||[];for(const o of l)await DB.del('files','pdf:'+o.path);await DB.put('kv','pdf-lru',[]);}
+const pdfLine=k=>k.n?`${k.n} kept · ${k.mb<10?k.mb.toFixed(1):Math.round(k.mb)} MB`:'none kept';
+async function pdfDownload(file,meta,onProg){
+  const prog={done:0,total:Math.max(1,Math.ceil((meta.size||0)/CHUNK))};
+  const t=setInterval(()=>onProg&&onProg(Math.min(1,prog.done/prog.total)),200);
+  try{
+    const e=await fetchChunked(file,{path:file,mime:'application/pdf'},prog);
+    if(!e.buf||!e.buf.byteLength)throw new GateError('no bytes');
+    const keep={path:file,modified:e.modified,size:e.buf.byteLength,buf:e.buf};
+    await pdfKeep(keep);return keep;
+  }finally{clearInterval(t);}
+}
+function pdfClose(){
+  const v=PDF.cur;if(!v)return;PDF.cur=null;v.dead=true;
+  try{v.ro&&v.ro.disconnect();v.io&&v.io.disconnect();}catch(e){}
+  v.pages.forEach(p=>{if(p.task)try{p.task.cancel();}catch(e){}if(p.cv){p.cv.width=p.cv.height=0;}});
+  try{v.doc&&v.doc.loadingTask.destroy();}catch(e){}
+  const b=$('#sh-b');b.classList.remove('pdf');b.onscroll=null;
+}
 async function showPdf(path,notePath,title,sub){
   SH.hist.push(()=>showPdf(path,notePath,title,sub));
-  const gn=path.startsWith('goodnotes/');
-  sheetOpen(title||path.split('/').pop().replace(/\.pdf$/i,''),sub||(gn?'Annotated slides':'PDF'));
-  sheetBody(`<p class="sheet-lead">Opening the link</p>`);
-  let link=null,err='';
-  try{const c=await cached(path);if(c&&c.link)link=c.link;else{const r=await api('read',{path});link=r.link;await remember({path,modified:r.modified,mime:r.mime,link});}}
-  catch(e){err=e instanceof NetError?'There is no connection, so the PDF cannot be opened right now.':'Could not find this PDF in Drive.';}
-  const page=(path.match(/#page=(\d+)/)||[])[1];
-  sheetBody(`<p class="sheet-lead">${link?`${gn?'Your annotated slides open':'This PDF opens'} in Google Drive${page?`. Go to page ${esc(page)}`:''}.`:esc(err)}</p>
-    <div class="acts">${link?`<a class="btn mark" href="${esc(link)}" target="_blank" rel="noopener">${svg('ext')}Open in Google Drive</a>`:''}
-    ${notePath?`<button class="btn quiet" type="button" id="sh-note">${svg('note')}Read the written note</button>`:''}</div>`);
-  const nb=$('#sh-note');if(nb)nb.addEventListener('click',()=>showNote(notePath));
+  const hash=path.indexOf('#'),file=hash<0?path:path.slice(0,hash),want=Number((path.match(/#page=(\d+)/)||[])[1])||1;
+  const gn=file.startsWith('goodnotes/'),label=sub||(gn?'Annotated slides':'PDF'),name=title||file.split('/').pop().replace(/\.pdf$/i,'');
+  sheetOpen(name,label);
+  const token={};PDF.token=token;const live=()=>PDF.token===token&&$('#sheet').classList.contains('open');
+  sheetBody(`<p class="sheet-lead">Opening the PDF</p><div class="pdfbar"><i></i></div>`);
+  const bar=f=>{const i=$('#sh-b .pdfbar i');if(i)i.style.width=Math.round(f*100)+'%';};
+  let link=null,meta=null,err='';
+  const acts=()=>{
+    $('#sh-acts').innerHTML=(notePath?`<button class="ib" id="sh-note" type="button" aria-label="Read the written note">${svg('note')}</button>`:'')+
+      (link?`<a class="ib" href="${esc(link)}" target="_blank" rel="noopener" aria-label="Open in Google Drive">${svg('ext')}</a>`:'');
+    const nb=$('#sh-note');if(nb)nb.addEventListener('click',()=>showNote(notePath));
+  };
+  const lc=await cached(file);if(lc&&lc.link)link=lc.link;acts();
+  const head=async()=>{const r=await api('read',{path:file},{bg:true});link=r.link||link;meta=r;await remember({path:file,modified:r.modified,mime:r.mime,link:r.link});if(live())acts();return r;};
+  const fallback=()=>{
+    if(!live())return;pdfClose();
+    sheetBody(`<p class="sheet-lead">${link?`${gn?'Your annotated slides open':'This PDF opens'} in Google Drive${want>1?`. Go to page ${want}`:''}.`:esc(err||'Could not open this PDF.')}</p>
+      <div class="acts">${link?`<a class="btn mark" href="${esc(link)}" target="_blank" rel="noopener">${svg('ext')}Open in Google Drive</a>`:''}
+      ${notePath?`<button class="btn quiet" type="button" id="sh-note2">${svg('note')}Read the written note</button>`:''}</div>`);
+    const nb=$('#sh-note2');if(nb)nb.addEventListener('click',()=>showNote(notePath));
+  };
+  let e=await DB.get('files','pdf:'+file);
+  try{
+    if(e&&e.buf){
+      pdfNote({path:file,size:e.size});
+      /* the kept copy shows now; a newer file in Drive replaces it behind */
+      head().then(async r=>{if(!live()||!r.modified||r.modified===e.modified)return;const n=await pdfDownload(file,r);if(live())pdfView(n,name,label,(PDF.cur&&PDF.cur.page)||want,token);}).catch(()=>{});
+    }else{
+      try{await head();}catch(x){err=x instanceof NetError?'There is no connection, so the PDF cannot be opened right now.':'Could not find this PDF in Drive.';throw x;}
+      e=await pdfDownload(file,meta,bar);
+    }
+    if(!live())return;
+    await pdfView(e,name,label,want,token);
+  }catch(x){console.warn('shell: pdf',x);fallback();}
+}
+async function pdfView(e,name,label,want,token){
+  const lib=await pdfLib();
+  const doc=await lib.getDocument({data:new Uint8Array(e.buf.slice(0)),isEvalSupported:false}).promise;
+  if(PDF.token!==token||!$('#sheet').classList.contains('open')){try{doc.loadingTask.destroy();}catch(x){}return;}
+  pdfClose();
+  const b=sheetBody('<div class="pdfv"></div>'),wrap=b.firstChild;b.classList.add('pdf');
+  const first=await doc.getPage(1),fv=first.getViewport({scale:1});
+  const v=PDF.cur={doc,z:1,page:1,pages:[],dead:false,b,wrap};
+  for(let i=1;i<=doc.numPages;i++){const el=document.createElement('div');el.className='pg';el.dataset.n=i;wrap.appendChild(el);v.pages.push({n:i,el,w:fv.width,h:fv.height,cv:null,task:null,rw:0,near:false});}
+  const head=()=>{$('#sh-t').innerHTML=esc(name)+`<small>${esc(label)} · ${v.page} / ${doc.numPages}</small>`;};
+  /* base width of a page at zoom 1: slides whole on the screen, portrait pages across it */
+  const base=p=>{const cs=getComputedStyle(wrap),W=b.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight),H=b.clientHeight-20;
+    return Math.max(120,p.w>p.h?Math.min(W,H*p.w/p.h):Math.min(W,1100));};
+  const layout=()=>{v.pages.forEach(p=>{const w=base(p)*v.z;p.el.style.width=w+'px';p.el.style.height=w*p.h/p.w+'px';});};
+  const goto=n=>{const p=v.pages[Math.max(1,Math.min(doc.numPages,n))-1];b.scrollTop=p.el.offsetTop-10;};
+  const draw=async p=>{
+    if(v.dead||!p.near)return;
+    const dpr=Math.min(window.devicePixelRatio||1,3);let pw=Math.round(p.el.clientWidth*dpr);
+    const cap=Math.sqrt(9e6/(pw*pw*p.h/p.w));if(cap<1)pw=Math.floor(pw*cap);       /* iOS: keep each canvas under ~9 MP */
+    if(p.cv&&Math.abs(p.rw-pw)<2)return;
+    if(p.task){try{p.task.cancel();}catch(x){}p.task=null;}
+    try{
+      const page=p.n===1?first:await doc.getPage(p.n);if(v.dead||!p.near)return;
+      const v1=page.getViewport({scale:1});
+      if(Math.abs(v1.width/v1.height-p.w/p.h)>.01){p.w=v1.width;p.h=v1.height;layout();return draw(p);}
+      const vp=page.getViewport({scale:pw/v1.width}),cv=document.createElement('canvas');cv.width=Math.round(vp.width);cv.height=Math.round(vp.height);
+      const task=p.task=page.render({canvasContext:cv.getContext('2d',{alpha:false}),viewport:vp});
+      await task.promise;if(p.task!==task)return;p.task=null;
+      if(v.dead||!p.near){cv.width=cv.height=0;return;}
+      if(p.cv){p.cv.width=p.cv.height=0;p.cv.remove();}
+      p.cv=cv;p.rw=pw;p.el.appendChild(cv);
+    }catch(x){if(!x||x.name!=='RenderingCancelledException')console.warn('shell: pdf page',p.n,x);}
+  };
+  const drawNear=()=>v.pages.forEach(p=>{if(p.near)draw(p);});
+  v.io=new IntersectionObserver(es=>{es.forEach(en=>{const p=v.pages[en.target.dataset.n-1];p.near=en.isIntersecting;
+    if(p.near)draw(p);else{if(p.task){try{p.task.cancel();}catch(x){}p.task=null;}if(p.cv){p.cv.width=p.cv.height=0;p.cv.remove();p.cv=null;p.rw=0;}}});},{root:b,rootMargin:'150% 50%'});
+  layout();v.pages.forEach(p=>v.io.observe(p.el));
+  goto(want);v.page=Math.max(1,Math.min(doc.numPages,want));head();
+  let st=0;
+  b.onscroll=()=>{if(st)return;st=requestAnimationFrame(()=>{st=0;if(v.dead)return;
+    const mid=b.scrollTop+b.clientHeight*.3;let n=v.page;
+    for(const p of v.pages){if(p.el.offsetTop<=mid)n=p.n;else break;}
+    if(n!==v.page){v.page=n;head();}});};
+  /* rotation / resize: lay out again and stay on the page being read */
+  let lw=b.clientWidth,lh=b.clientHeight;
+  v.ro=new ResizeObserver(()=>{if(v.dead||(b.clientWidth===lw&&b.clientHeight===lh)||!b.clientWidth)return;lw=b.clientWidth;lh=b.clientHeight;
+    const n=v.page;if(v.z<1.05)v.z=1;layout();goto(n);b.scrollLeft=Math.max(0,(b.scrollWidth-b.clientWidth)/2);drawNear();});
+  v.ro.observe(b);
+  /* zoom about a point on the screen (pinch, double-tap, ctrl-wheel) */
+  const zoomTo=(z,cx,cy)=>{
+    z=Math.max(1,Math.min(6,z));if(z===v.z)return;
+    const r=b.getBoundingClientRect(),x=cx-r.left,y=cy-r.top,wr=wrap.getBoundingClientRect();
+    const fx=(cx-wr.left)/wr.width,fy=(cy-wr.top)/wr.height;
+    v.z=z;layout();
+    const nr=wrap.getBoundingClientRect();
+    b.scrollLeft+=nr.left+fx*nr.width-cx;b.scrollTop+=nr.top+fy*nr.height-cy;
+  };
+  let pin=null,zt=0,lastTap=null;
+  const settle=()=>{clearTimeout(zt);zt=setTimeout(()=>{if(!v.dead)drawNear();},180);};
+  const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+  wrap.addEventListener('touchstart',ev=>{if(ev.touches.length===2){pin={d:dist(ev.touches),z:v.z};lastTap=null;}},{passive:true});
+  wrap.addEventListener('touchmove',ev=>{if(!pin||ev.touches.length!==2)return;ev.preventDefault();
+    const t=ev.touches;zoomTo(pin.z*dist(t)/pin.d,(t[0].clientX+t[1].clientX)/2,(t[0].clientY+t[1].clientY)/2);},{passive:false});
+  const tend=ev=>{
+    if(pin){if(ev.touches.length<2){pin=null;settle();}return;}
+    if(ev.type!=='touchend'||ev.touches.length||ev.changedTouches.length!==1)return;
+    const t=ev.changedTouches[0],now=Date.now();
+    if(lastTap&&now-lastTap.at<300&&Math.hypot(t.clientX-lastTap.x,t.clientY-lastTap.y)<30){ev.preventDefault();lastTap=null;zoomTo(v.z>1.05?1:2.5,t.clientX,t.clientY);settle();}
+    else lastTap={at:now,x:t.clientX,y:t.clientY};
+  };
+  wrap.addEventListener('touchend',tend,{passive:false});wrap.addEventListener('touchcancel',tend,{passive:false});
+  wrap.addEventListener('wheel',ev=>{if(!ev.ctrlKey)return;ev.preventDefault();ev.stopPropagation();zoomTo(v.z*Math.exp(-ev.deltaY/200),ev.clientX,ev.clientY);settle();},{passive:false});
 }
 async function showImage(path){
   SH.hist.push(()=>showImage(path));
@@ -1221,7 +1373,7 @@ async function showImage(path){
     sheetBody(`<div class="md"><img src="${u}" alt=""></div>`);}
   catch(e){sheetBody('<p class="sheet-lead">This image is not on the phone yet.</p>');}
 }
-/* ss-open / wikilinks: the plugin's openPath(), on a phone: a note opens in the sheet, a PDF offers Drive */
+/* ss-open / wikilinks: the plugin's openPath(), on a phone: a note or a PDF opens in the sheet */
 async function openPath(raw,from){
   const s=String(raw||''),h=s.indexOf('#'),lp=h<0?s:s.slice(0,h),sub=h<0?'':s.slice(h+1);
   const tp=await resolveLink(lp,from);
@@ -1701,8 +1853,9 @@ function openSettings(){
     <p class="note">The order of the cards on this screen and of swiping on the tab bar. You can also hold a card and drag it.</p>
   <h3>Appearance</h3><p class="lbl">Theme</p>${seg('theme',PREF.theme,[['auto','System'],['light','Light'],['dark','Dark']])}
   <h3>Motion</h3><p class="lbl">Reduce motion</p>${seg('motion',PREF.motion,[['auto','System'],['on','On']])}
-  <h3>Data</h3><div class="rowinfo"><div><span>SQL engine</span><span class="num" id="set-pg">${esc(pgLine())}</span></div></div>
+  <h3>Data</h3><div class="rowinfo"><div><span>SQL engine</span><span class="num" id="set-pg">${esc(pgLine())}</span></div><div><span>PDFs</span><span class="num" id="set-pdf"></span></div></div>
     <div class="acts"><button class="btn quiet" type="button" id="set-pgdl"${PG.state==='ready'?' hidden':''}>Download now</button>
+    <button class="btn quiet" type="button" id="set-pdfclr" hidden>Remove kept PDFs</button>
     <button class="btn quiet" type="button" id="set-clear">Clear saved copies</button></div>
     <p class="note">Clearing removes the copies of the apps, notes and SQL engine kept on this phone. They download again; your key and unsaved changes stay.</p>
   <h3>Connection</h3><div class="acts"><button class="btn quiet" type="button" id="cx-edit">Change the URL or key</button>
@@ -1722,6 +1875,9 @@ function openSettings(){
   $('#cx-diag').href='diag.html?shell='+encodeURIComponent(JSON.stringify({ins:insets(),app:appInsets(),strips:osStrips(),standalone:STANDALONE}));
   $('#cx-diag').addEventListener('click',e=>{e.preventDefault();location.replace($('#cx-diag').href);});
   $('#set-pgdl').addEventListener('click',()=>{if(!navigator.onLine){toast('It needs a connection.');return;}pgDownload().catch(()=>{}).then(sheetRefresh);sheetRefresh();});
+  const pdfRow=async()=>{const k=await pdfKept();if(!$('#set-pdf'))return;$('#set-pdf').textContent=pdfLine(k);$('#set-pdfclr').hidden=!k.n;};
+  pdfNote({}).then(pdfRow,pdfRow);
+  $('#set-pdfclr').addEventListener('click',async()=>{await pdfForget();pdfRow();});
   $('#set-clear').addEventListener('click',async()=>{
     if(!navigator.onLine){toast('Not while offline: the apps would have nothing to open.');return;}
     if(!confirm('Clear the copies kept on this phone? Both apps download again (about 4 MB, and 17 MB more for the SQL engine). Your key and unsaved changes stay.'))return;
