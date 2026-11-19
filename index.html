@@ -332,7 +332,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* the apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v30',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v31',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -1271,7 +1271,7 @@ async function showPdf(path,notePath,title,sub){
     const nb=$('#sh-note');if(nb)nb.addEventListener('click',()=>showNote(notePath));
   };
   const lc=await cached(file);if(lc&&lc.link)link=lc.link;acts();
-  const head=async()=>{const r=await api('read',{path:file},{bg:true});link=r.link||link;meta=r;await remember({path:file,modified:r.modified,mime:r.mime,link:r.link});if(live())acts();return r;};
+  const head=async()=>{const r=await api('read',{path:file,length:1},{bg:true});link=r.link||link;meta=r;await remember({path:file,modified:r.modified,mime:r.mime,link:r.link});if(live())acts();return r;};
   const fallback=()=>{
     if(!live())return;pdfClose();
     sheetBody(`<p class="sheet-lead">${link?`${gn?'Your annotated slides open':'This PDF opens'} in Google Drive${want>1?`. Go to page ${want}`:''}.`:esc(err||'Could not open this PDF.')}</p>
