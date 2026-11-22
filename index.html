@@ -332,7 +332,7 @@ const MQ=matchMedia('(prefers-color-scheme: dark)'),RM=matchMedia('(prefers-redu
 const TP=P.get('theme');
 /* phone-only preferences (Settings): kept in this phone's localStorage, never in the vault */
 const PHONE_MAX=600;   /* the apps' phone layer: (max-width:600px). Declared before anything at boot reads it */
-const SHELL_VERSION='v31',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
+const SHELL_VERSION='v32',PREF_KEY='study-shell.prefs',LAST_KEY='study-shell.last';
 const readLS=(k,d)=>{try{return Object.assign(d,JSON.parse(localStorage.getItem(k)||'{}'));}catch(e){return d;}};
 const PREF=readLS(PREF_KEY,{order:null,openTo:'last',theme:'auto',motion:'auto'});
 const LAST=readLS(LAST_KEY,{app:null,pages:{}});
@@ -1045,6 +1045,42 @@ function sliceSection(md,heading,until){
   }
   return start<0?null:lines.slice(start,end).join('\n').trim();
 }
+/* The study-space plugin's stanzaGaps(), verbatim: a blank line Jaden leaves between top-level bullets becomes an empty
+   .ss-gap div, so the stanza breaks he writes survive into a lesson's note panel (Markdown would only make the list loose). */
+function stanzaGaps(md){
+  const L=String(md||'').split('\n'),out=[],isItem=x=>/^(?:[-*+]|\d+[.)])\s/.test(x),inList=x=>/^\s*(?:[-*+]|\d+[.)])\s/.test(x);
+  let fence=false,lastList=false;
+  for(let i=0;i<L.length;i++){
+    const ln=L[i];
+    if(/^\s*(```|~~~)/.test(ln)){fence=!fence;lastList=false;out.push(ln);continue;}
+    if(fence){out.push(ln);continue;}
+    if(ln.trim()===''){
+      let j=i+1;while(j<L.length&&L[j].trim()==='')j++;
+      if(lastList&&j<L.length&&isItem(L[j])){out.push('','<div class="ss-gap"></div>','');i=j-1;lastList=false;continue;}
+      out.push(ln);continue;
+    }
+    lastList=inList(ln)||(lastList&&/^\s+\S/.test(ln));
+    out.push(ln);
+  }
+  return out.join('\n');
+}
+/* A note section as Study Space expects it: the stanza gaps, and callouts in the shape Obsidian's renderer gives them
+   (.callout[data-callout] > .callout-title > .callout-title-inner, then .callout-content), which is what the app's
+   lesson styles and its slice filter read. Never folded here: the app has no fold control, so the content always shows. */
+function sliceDom(sec){
+  const body=mdToDom(stanzaGaps(sec)),doc=body.ownerDocument;
+  body.querySelectorAll('.callout').forEach(c=>{
+    const d=doc.createElement('div');d.className='callout';d.setAttribute('data-callout',c.dataset.type||'note');
+    const t=c.querySelector(':scope > .ct'),ti=doc.createElement('div');ti.className='callout-title';
+    const inner=doc.createElement('div');inner.className='callout-title-inner';inner.innerHTML=t?t.innerHTML:'';ti.appendChild(inner);if(t)t.remove();
+    const cc=doc.createElement('div');cc.className='callout-content';while(c.firstChild)cc.appendChild(c.firstChild);
+    d.appendChild(ti);if(cc.textContent.trim()||cc.querySelector('img,span.emb'))d.appendChild(cc);c.replaceWith(d);
+  });
+  /* #exam and other inline tags are navigation in the vault, not content: the plugin drops them from a slice, so does the shell */
+  const tw=doc.createTreeWalker(body,NodeFilter.SHOW_TEXT),texts=[];while(tw.nextNode())texts.push(tw.currentNode);
+  texts.forEach(n=>{if(n.parentElement&&n.parentElement.closest('code,pre,a'))return;const v=n.nodeValue.replace(/(^|\s)#[A-Za-z][\w/-]*(?=\s|$)/g,'$1');if(v!==n.nodeValue)n.nodeValue=v;});
+  return body;
+}
 const normHead=x=>String(x||'').replace(/[*_`~]/g,'').replace(/\s+#*\s*$/,'').trim().toLowerCase().replace(/\s+/g,' ');
 function mdToDom(md){
   md=String(md||'').replace(/^﻿?---\r?\n[\s\S]*?\r?\n---[ \t]*(\r?\n|$)/,'');
@@ -1073,7 +1109,8 @@ function mdToDom(md){
   /* callouts: > [!type]± Title */
   body.querySelectorAll('blockquote').forEach(bq=>{
     const p=bq.firstElementChild;if(!p||p.tagName!=='P')return;
-    const m=/^\s*\[!([\w-]+)\]([+-]?)[ \t]*([^\n<]*?)\s*(<br>|$)/.exec(p.innerHTML.replace(/\n/g,''));if(!m)return;
+    /* the title runs to the first line break: it may hold bold, code and highlights (his callout titles are whole statements) */
+    const m=/^\s*\[!([\w-]+)\]([+-]?)[ \t]*([\s\S]*?)\s*(<br\s*\/?>|$)/.exec(p.innerHTML.replace(/\n/g,''));if(!m)return;
     /* foldable callouts (+ open, - folded, as Obsidian draws them) become a disclosure */
     const fold=m[2]==='-'||m[2]==='+';
     const div=doc.createElement(fold?'details':'div');div.className='callout';div.dataset.type=m[1].toLowerCase();if(m[2]==='+')div.open=true;
@@ -1115,7 +1152,7 @@ async function sendSlice(a,d){
     let md;try{md=await getText(path);}catch(e){return reply({ok:false,why:(e instanceof NetError?'offline: ':'note missing: ')+path});}
     const sec=sliceSection(md,d.heading,d.until);
     if(sec==null)return reply({ok:false,why:'heading missing: '+d.heading});
-    const body=mdToDom(sec);
+    const body=sliceDom(sec);
     for(const span of[...body.querySelectorAll('span.emb')]){
       const src=(span.dataset.src||'').split('|')[0].split('#')[0];
       const tp=await resolveLink(src,path);let url=null;try{url=tp?await dataUrl(tp):null;}catch(e){}
